@@ -67,6 +67,32 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertEqual(try store.loadAPIKey(), apiKey)
     }
 
+    func testTOMLStandardAndUnicodeEscapesAreAccepted() throws {
+        let location = makeTemporaryConfigLocation()
+        defer { try? FileManager.default.removeItem(at: location.root) }
+        try FileManager.default.createDirectory(
+            at: location.root,
+            withIntermediateDirectories: true
+        )
+        let content = Data(
+            Array("ark_plan_api_key = \"a".utf8)
+                + [0x5C, 0x62]
+                + Array("b".utf8)
+                + [0x5C, 0x66]
+                + Array("c".utf8)
+                + [0x5C, 0x55]
+                + Array("0001F642".utf8)
+                + [0x5C, 0x5C]
+                + Array("U0001F642\"\n".utf8)
+        )
+        try writePrivateFixture(content, to: location.file)
+
+        XCTAssertEqual(
+            try ConfigFileStore(fileURL: location.file).loadAPIKey(),
+            "a\u{8}b\u{C}c🙂\\U0001F642"
+        )
+    }
+
     func testLoadingIgnoresBlankAndCommentOnlyLines() throws {
         let location = makeTemporaryConfigLocation()
         defer { try? FileManager.default.removeItem(at: location.root) }
@@ -75,7 +101,7 @@ final class ConfigurationTests: XCTestCase {
             withIntermediateDirectories: true
         )
         let content = "\n  # local credential\n\nark_plan_api_key = \"saved-key\"\n"
-        try Data(content.utf8).write(to: location.file)
+        try writePrivateFixture(Data(content.utf8), to: location.file)
 
         XCTAssertEqual(
             try ConfigFileStore(fileURL: location.file).loadAPIKey(),
@@ -96,12 +122,17 @@ final class ConfigurationTests: XCTestCase {
             Data("ark_plan_api_key \"value\"\n".utf8),
             Data("# no assignment\n\n".utf8),
             Data("ark_plan_api_key = unquoted\n".utf8),
+            Data(
+                Array("ark_plan_api_key = \"a".utf8)
+                    + [0x5C, 0x2F]
+                    + Array("b\"\n".utf8)
+            ),
             Data([0xFF]),
         ]
         let store = ConfigFileStore(fileURL: location.file)
 
         for document in invalidDocuments {
-            try document.write(to: location.file, options: .atomic)
+            try writePrivateFixture(document, to: location.file)
             XCTAssertThrowsError(try store.loadAPIKey()) { error in
                 XCTAssertEqual(error as? ConfigurationError, .invalidFile)
             }
@@ -129,8 +160,10 @@ final class ConfigurationTests: XCTestCase {
             at: location.root,
             withIntermediateDirectories: true
         )
-        try Data("ark_plan_api_key = \"synthetic-key\"\n".utf8)
-            .write(to: location.file)
+        try writePrivateFixture(
+            Data("ark_plan_api_key = \"synthetic-key\"\n".utf8),
+            to: location.file
+        )
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o000],
             ofItemAtPath: location.root.path
@@ -205,4 +238,11 @@ private extension ConfigurationTests {
         return (root, directory.appendingPathComponent("config.toml"))
     }
 
+    func writePrivateFixture(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: url.path
+        )
+    }
 }
