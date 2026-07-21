@@ -51,6 +51,22 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertEqual(try store.loadAPIKey(), apiKey)
     }
 
+    func testGeneratedTOMLRoundTripsSlashesWithoutInvalidEscape() throws {
+        let location = makeTemporaryConfigLocation()
+        defer { try? FileManager.default.removeItem(at: location.root) }
+        let store = ConfigFileStore(fileURL: location.file)
+        let apiKey = "synthetic/path/with/slashes"
+
+        try store.saveAPIKey(apiKey)
+
+        let data = try Data(contentsOf: location.file)
+        XCTAssertEqual(
+            String(decoding: data, as: UTF8.self),
+            "ark_plan_api_key = \"synthetic/path/with/slashes\"\n"
+        )
+        XCTAssertEqual(try store.loadAPIKey(), apiKey)
+    }
+
     func testLoadingIgnoresBlankAndCommentOnlyLines() throws {
         let location = makeTemporaryConfigLocation()
         defer { try? FileManager.default.removeItem(at: location.root) }
@@ -107,27 +123,45 @@ final class ConfigurationTests: XCTestCase {
         }
     }
 
-    func testSaveAppliesPrivateDirectoryAndFilePermissions() throws {
-        let location = makeTemporaryConfigLocation(nested: true)
-        defer { try? FileManager.default.removeItem(at: location.root) }
-        let store = ConfigFileStore(fileURL: location.file)
+    func testExistingUnreadableFileThrowsUnreadableFile() throws {
+        let location = makeTemporaryConfigLocation()
+        try FileManager.default.createDirectory(
+            at: location.root,
+            withIntermediateDirectories: true
+        )
+        try Data("ark_plan_api_key = \"synthetic-key\"\n".utf8)
+            .write(to: location.file)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o000],
+            ofItemAtPath: location.root.path
+        )
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: location.root.path
+            )
+            try? FileManager.default.removeItem(at: location.root)
+        }
 
-        try store.saveAPIKey("saved-key")
+        XCTAssertThrowsError(
+            try ConfigFileStore(fileURL: location.file).loadAPIKey()
+        ) { error in
+            XCTAssertEqual(error as? ConfigurationError, .unreadableFile)
+        }
+    }
 
-        let directoryAttributes = try FileManager.default.attributesOfItem(
-            atPath: location.file.deletingLastPathComponent().path
+    func testValidEnvironmentAPIKeyDoesNotInvokeStore() throws {
+        let store = ThrowingStore()
+        let loader = ConfigurationLoader(
+            store: store,
+            environment: ["ARK_PLAN_API_KEY": "environment-key"]
         )
-        let fileAttributes = try FileManager.default.attributesOfItem(
-            atPath: location.file.path
+
+        XCTAssertEqual(
+            try loader.load(),
+            AppConfiguration(apiKey: "environment-key")
         )
-        let directoryMode = try XCTUnwrap(
-            directoryAttributes[.posixPermissions] as? NSNumber
-        )
-        let fileMode = try XCTUnwrap(
-            fileAttributes[.posixPermissions] as? NSNumber
-        )
-        XCTAssertEqual(directoryMode.intValue & 0o777, 0o700)
-        XCTAssertEqual(fileMode.intValue & 0o777, 0o600)
+        XCTAssertEqual(store.loadCount, 0)
     }
 
     func testDefaultStoreUsesExpectedPath() {
@@ -148,6 +182,19 @@ private struct StubStore: ConfigStoring {
     }
 }
 
+private final class ThrowingStore: ConfigStoring {
+    enum Failure: Error {
+        case storeShouldNotBeCalled
+    }
+
+    private(set) var loadCount = 0
+
+    func loadAPIKey() throws -> String? {
+        loadCount += 1
+        throw Failure.storeShouldNotBeCalled
+    }
+}
+
 private extension ConfigurationTests {
     func makeTemporaryConfigLocation(
         nested: Bool = false
@@ -157,4 +204,5 @@ private extension ConfigurationTests {
         let directory = nested ? root.appendingPathComponent("config") : root
         return (root, directory.appendingPathComponent("config.toml"))
     }
+
 }

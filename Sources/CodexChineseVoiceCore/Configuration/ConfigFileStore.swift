@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public struct ConfigFileStore: ConfigStoring, Sendable {
     private static let key = "ark_plan_api_key"
@@ -17,22 +18,15 @@ public struct ConfigFileStore: ConfigStoring, Sendable {
     }
 
     public func loadAPIKey() throws -> String? {
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(
-            atPath: fileURL.path,
-            isDirectory: &isDirectory
-        ) else {
-            return nil
-        }
-        guard !isDirectory.boolValue else {
-            throw ConfigurationError.unreadableFile
-        }
+        try Self.rejectSymbolicLinks(in: fileURL)
 
         let data: Data
         do {
             data = try Data(contentsOf: fileURL)
         } catch {
+            if Self.isMissingFileError(error) {
+                return nil
+            }
             throw ConfigurationError.unreadableFile
         }
 
@@ -44,18 +38,18 @@ public struct ConfigFileStore: ConfigStoring, Sendable {
 
     public func saveAPIKey(_ apiKey: String) throws {
         let fileManager = FileManager.default
-        let directoryURL = fileURL.deletingLastPathComponent()
 
         do {
-            try fileManager.createDirectory(
-                at: directoryURL,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-            try fileManager.setAttributes(
-                [.posixPermissions: 0o700],
-                ofItemAtPath: directoryURL.path
-            )
+            let directoryURL = fileURL.deletingLastPathComponent()
+            try Self.rejectSymbolicLinks(in: fileURL)
+            let directoryWasCreated = try Self.prepareDirectory(at: directoryURL)
+            try Self.rejectSymbolicLinks(in: fileURL)
+            if directoryWasCreated {
+                try fileManager.setAttributes(
+                    [.posixPermissions: 0o700],
+                    ofItemAtPath: directoryURL.path
+                )
+            }
 
             let encodedKey = try Self.encode(apiKey)
             let contents = "\(Self.key) = \(encodedKey)\n"
@@ -73,6 +67,104 @@ public struct ConfigFileStore: ConfigStoring, Sendable {
 }
 
 private extension ConfigFileStore {
+    static func prepareDirectory(at url: URL) throws -> Bool {
+        let path = url.absoluteURL.standardizedFileURL
+        var current = URL(fileURLWithPath: "/")
+        var targetWasCreated = false
+
+        for component in path.pathComponents.dropFirst() {
+            current.appendPathComponent(component)
+            var info = stat()
+            if lstat(current.path, &info) == 0 {
+                try validateExistingDirectory(info, at: current)
+                continue
+            }
+
+            let errorNumber = errno
+            guard errorNumber == ENOENT else {
+                throw ConfigurationError.unreadableFile
+            }
+            guard mkdir(current.path, mode_t(0o700)) == 0 else {
+                if errno != EEXIST {
+                    throw ConfigurationError.unreadableFile
+                }
+                var racedInfo = stat()
+                guard lstat(current.path, &racedInfo) == 0 else {
+                    throw ConfigurationError.unreadableFile
+                }
+                try validateExistingDirectory(racedInfo, at: current)
+                continue
+            }
+
+            targetWasCreated = current.path == path.path
+            guard chmod(current.path, mode_t(0o700)) == 0 else {
+                throw ConfigurationError.unreadableFile
+            }
+        }
+        return targetWasCreated
+    }
+
+    static func rejectSymbolicLinks(in url: URL) throws {
+        let path = url.absoluteURL.standardizedFileURL
+        var current = URL(fileURLWithPath: "/")
+
+        for component in path.pathComponents.dropFirst() {
+            current.appendPathComponent(component)
+            var info = stat()
+            if lstat(current.path, &info) == 0 {
+                try rejectCustomSymbolicLink(info, at: current)
+                continue
+            }
+
+            let errorNumber = errno
+            if errorNumber != ENOENT {
+                throw ConfigurationError.unreadableFile
+            }
+        }
+    }
+
+    static func validateExistingDirectory(_ info: stat, at url: URL) throws {
+        let mode = info.st_mode & mode_t(S_IFMT)
+        if mode == mode_t(S_IFLNK) {
+            guard isAllowedSystemAlias(at: url) else {
+                throw ConfigurationError.unreadableFile
+            }
+            return
+        }
+        guard mode == mode_t(S_IFDIR) else {
+            throw ConfigurationError.unreadableFile
+        }
+    }
+
+    static func rejectCustomSymbolicLink(_ info: stat, at url: URL) throws {
+        let mode = info.st_mode & mode_t(S_IFMT)
+        if mode == mode_t(S_IFLNK), !isAllowedSystemAlias(at: url) {
+            throw ConfigurationError.unreadableFile
+        }
+    }
+
+    static func isAllowedSystemAlias(at url: URL) -> Bool {
+        let expectedDestinations: [String: Set<String>] = [
+            "/var": ["private/var", "/private/var"],
+            "/tmp": ["private/tmp", "/private/tmp"],
+            "/etc": ["private/etc", "/private/etc"],
+        ]
+        guard let destination = try? FileManager.default
+            .destinationOfSymbolicLink(atPath: url.path) else {
+            return false
+        }
+        return expectedDestinations[url.path]?.contains(destination) == true
+    }
+
+    static func isMissingFileError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain {
+            return nsError.code == NSFileReadNoSuchFileError
+                || nsError.code == NSFileNoSuchFileError
+        }
+        return nsError.domain == NSPOSIXErrorDomain && nsError.code == ENOENT
+    }
+
     static func parse(_ contents: String) throws -> String {
         var apiKey: String?
 
@@ -114,7 +206,9 @@ private extension ConfigFileStore {
 
     static func encode(_ apiKey: String) throws -> String {
         do {
-            let data = try JSONEncoder().encode(apiKey)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.withoutEscapingSlashes]
+            let data = try encoder.encode(apiKey)
             guard let encoded = String(data: data, encoding: .utf8) else {
                 throw ConfigurationError.invalidFile
             }
