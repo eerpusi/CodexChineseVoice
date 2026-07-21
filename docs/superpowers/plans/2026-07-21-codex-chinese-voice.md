@@ -103,7 +103,11 @@ git commit -m "feat: scaffold Swift command and configuration"
 - Create: `Sources/CodexChineseVoiceCore/ASR/ASRProvider.swift`
 - Create: `Sources/CodexChineseVoiceCore/ASR/GzipCodec.swift`
 - Create: `Sources/CodexChineseVoiceCore/ASR/VolcengineProtocol.swift`
-- Create: `Tests/CodexChineseVoiceCoreTests/ProtocolTests.swift`
+- Create: `Sources/CodexChineseVoiceCore/ASR/VolcengineProtocolParsing.swift`
+- Create: `Tests/CodexChineseVoiceCoreTests/GzipCodecTests.swift`
+- Create: `Tests/CodexChineseVoiceCoreTests/ProtocolRequestTests.swift`
+- Create: `Tests/CodexChineseVoiceCoreTests/ProtocolParsingTests.swift`
+- Create: `Tests/CodexChineseVoiceCoreTests/ProtocolTestSupport.swift`
 
 - [ ] **Step 1: Add failing frame and parser tests**
 
@@ -122,7 +126,7 @@ func testFinalServerFlagMarksTranscriptFinal() throws {
 
 - [ ] **Step 2: Verify the protocol tests fail**
 
-Run: `swift test --filter ProtocolTests`
+Run: `swift test --filter Protocol && swift test --filter GzipCodecTests`
 Expected: FAIL to compile because `VolcengineProtocol` is missing.
 
 - [ ] **Step 3: Implement strict framing and gzip**
@@ -143,13 +147,17 @@ Use big-endian `Int32`/`UInt32`, validate every cursor advance and payload lengt
 
 - [ ] **Step 4: Cover malformed and unsupported frames**
 
-Run: `swift test --filter ProtocolTests`
+Run: `swift test --filter Protocol && swift test --filter GzipCodecTests`
 Expected: PASS for request, audio, partial, final, truncated, invalid-size, invalid-gzip, and error-frame tests.
 
 - [ ] **Step 5: Commit protocol support**
 
 ```sh
-git add Sources/CodexChineseVoiceCore/ASR Tests/CodexChineseVoiceCoreTests/ProtocolTests.swift
+git add Sources/CodexChineseVoiceCore/ASR \
+  Tests/CodexChineseVoiceCoreTests/GzipCodecTests.swift \
+  Tests/CodexChineseVoiceCoreTests/ProtocolRequestTests.swift \
+  Tests/CodexChineseVoiceCoreTests/ProtocolParsingTests.swift \
+  Tests/CodexChineseVoiceCoreTests/ProtocolTestSupport.swift
 git commit -m "feat: add Volcengine streaming protocol"
 ```
 

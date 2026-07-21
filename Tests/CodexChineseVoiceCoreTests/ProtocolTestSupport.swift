@@ -16,7 +16,8 @@ enum ProtocolTestSupport {
             body = payload
         } else {
             let source = json ?? #"{"result":{"text":"\#(text ?? "")"}}"#
-            body = try GzipCodec.compress(Data(source.utf8))
+            let jsonData = Data(source.utf8)
+            body = compression == 1 ? try GzipCodec.compress(jsonData) : jsonData
         }
         var frame = Data([0x11, (type << 4) | flags, 0x10 | compression, 0x00])
         if flags & 0x1 != 0 {
