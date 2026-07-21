@@ -17,6 +17,9 @@ extension VolcengineProtocol {
         let sequence: Int32? = header.flags & 0x1 == 0
             ? nil
             : try readInt32(from: data, cursor: &cursor)
+        if header.flags & 0x1 != 0, sequence == 0 {
+            throw VolcengineProtocolError.invalidSequence
+        }
         let event: Int32? = header.flags & 0x4 == 0
             ? nil
             : try readInt32(from: data, cursor: &cursor)
@@ -82,6 +85,13 @@ private extension VolcengineProtocol {
         guard flags <= 0x7 else {
             throw VolcengineProtocolError.unsupportedFlags(flags)
         }
+        let type = data[1] >> 4
+        guard type == 0x9 || type == 0xf else {
+            throw VolcengineProtocolError.unsupportedMessageType(type)
+        }
+        if type == 0xf, flags != 0 {
+            throw VolcengineProtocolError.unsupportedFlags(flags)
+        }
         let serialization = data[2] >> 4
         guard serialization <= 1 else {
             throw VolcengineProtocolError.unsupportedSerialization(serialization)
@@ -89,10 +99,6 @@ private extension VolcengineProtocol {
         let compression = data[2] & 0x0f
         guard compression <= 1 else {
             throw VolcengineProtocolError.unsupportedCompression(compression)
-        }
-        let type = data[1] >> 4
-        guard type == 0x9 || type == 0xf else {
-            throw VolcengineProtocolError.unsupportedMessageType(type)
         }
         cursor = headerBytes
         return Header(
@@ -165,13 +171,41 @@ private extension VolcengineProtocol {
         guard let dictionary = object as? [String: Any] else {
             throw VolcengineProtocolError.invalidPayload
         }
-        let result = dictionary["result"] as? [String: Any]
-        let value = result?["text"] ?? dictionary["text"]
-        guard let value else { return nil }
+        let text = try transcriptText(from: dictionary)
+        guard let text else { return nil }
+        return TranscriptEvent(text: text, isFinal: isFinal)
+    }
+
+    static func transcriptText(from response: [String: Any]) throws -> String? {
+        if let result = response["result"] {
+            if let object = result as? [String: Any] {
+                return try textValue(in: object)
+            }
+            if let array = result as? [Any] {
+                for element in array.reversed() {
+                    guard let object = element as? [String: Any],
+                          let text = object["text"] as? String,
+                          !text.isEmpty
+                    else {
+                        continue
+                    }
+                    return text
+                }
+                return nil
+            }
+            if !(result is NSNull) {
+                throw VolcengineProtocolError.invalidPayload
+            }
+        }
+        return try textValue(in: response)
+    }
+
+    static func textValue(in object: [String: Any]) throws -> String? {
+        guard let value = object["text"] else { return nil }
         guard let text = value as? String else {
             throw VolcengineProtocolError.invalidPayload
         }
-        return TranscriptEvent(text: text, isFinal: isFinal)
+        return text
     }
 
     static func isFinal(flags: UInt8, sequence: Int32?) -> Bool {
