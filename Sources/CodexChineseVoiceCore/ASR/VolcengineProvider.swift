@@ -10,7 +10,7 @@ public enum VolcengineProviderError: Error, Equatable, Sendable {
 /// Streams PCM chunks to the Volcengine Agent Plan endpoint.
 public struct VolcengineProvider: ASRProvider, Sendable {
     private let apiKey: String
-    private let session: URLSession
+    private let transport: any VolcengineTransport
     private let requestIDOverride: String?
     private let connectIDOverride: String?
     private let language: String
@@ -23,7 +23,21 @@ public struct VolcengineProvider: ASRProvider, Sendable {
         language: String = "zh-CN"
     ) {
         self.apiKey = apiKey
-        self.session = session
+        transport = URLSessionVolcengineTransport(session: session)
+        requestIDOverride = requestID
+        connectIDOverride = connectID
+        self.language = language
+    }
+
+    init(
+        apiKey: String,
+        transport: any VolcengineTransport,
+        requestID: String? = nil,
+        connectID: String? = nil,
+        language: String = "zh-CN"
+    ) {
+        self.apiKey = apiKey
+        self.transport = transport
         requestIDOverride = requestID
         connectIDOverride = connectID
         self.language = language
@@ -49,14 +63,6 @@ public struct VolcengineProvider: ASRProvider, Sendable {
 }
 
 private extension VolcengineProvider {
-    final class WebSocketBox: @unchecked Sendable {
-        let task: URLSessionWebSocketTask
-
-        init(_ task: URLSessionWebSocketTask) {
-            self.task = task
-        }
-    }
-
     enum WorkerResult: Sendable {
         case senderFinished
         case receiverFinished
@@ -87,42 +93,45 @@ private extension VolcengineProvider {
         request.setValue(connectID, forHTTPHeaderField: "X-Api-Connect-Id")
         request.setValue("1", forHTTPHeaderField: "X-Api-Sequence")
 
-        let socket = WebSocketBox(session.webSocketTask(with: request))
-        socket.task.resume()
-        defer {
-            socket.task.cancel(with: .normalClosure, reason: nil)
-        }
+        let connection = try await transport.connect(request)
+        defer { connection.close() }
 
-        try Task.checkCancellation()
-        try await socket.task.send(.data(clientFrame))
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await connection.send(clientFrame)
 
-        try await withThrowingTaskGroup(of: WorkerResult.self) { group in
-            group.addTask {
-                try await sendAudio(audio, on: socket)
-            }
-            group.addTask {
-                try await receiveEvents(from: socket, continuation: continuation)
-            }
-
-            do {
-                guard let first = try await group.next() else { return }
-                switch first {
-                case .receiverFinished:
-                    group.cancelAll()
-                case .senderFinished:
-                    _ = try await group.next()
-                    group.cancelAll()
+            try await withThrowingTaskGroup(of: WorkerResult.self) { group in
+                group.addTask {
+                    try await sendAudio(audio, on: connection)
                 }
-            } catch {
-                group.cancelAll()
-                throw error
+                group.addTask {
+                    try await receiveEvents(from: connection, continuation: continuation)
+                }
+
+                do {
+                    guard let first = try await group.next() else { return }
+                    switch first {
+                    case .receiverFinished:
+                        connection.close()
+                        group.cancelAll()
+                    case .senderFinished:
+                        _ = try await group.next()
+                        group.cancelAll()
+                    }
+                } catch {
+                    connection.close()
+                    group.cancelAll()
+                    throw error
+                }
             }
+        } onCancel: {
+            connection.close()
         }
     }
 
     func sendAudio(
         _ audio: AsyncThrowingStream<Data, Error>,
-        on socket: WebSocketBox
+        on connection: any VolcengineConnection
     ) async throws -> WorkerResult {
         var sequence = 2
         for try await chunk in audio {
@@ -132,7 +141,7 @@ private extension VolcengineProvider {
                 sequence: sequence,
                 isFinal: false
             )
-            try await socket.task.send(.data(frame))
+            try await connection.send(frame)
             sequence += 1
         }
 
@@ -142,40 +151,41 @@ private extension VolcengineProvider {
             sequence: sequence,
             isFinal: true
         )
-        try await socket.task.send(.data(finalFrame))
+        try await connection.send(finalFrame)
         return .senderFinished
     }
 
     func receiveEvents(
-        from socket: WebSocketBox,
+        from connection: any VolcengineConnection,
         continuation: AsyncThrowingStream<TranscriptEvent, Error>.Continuation
     ) async throws -> WorkerResult {
+        var lastPartialText: String?
         while true {
             do {
                 try Task.checkCancellation()
-                let message = try await socket.task.receive()
+                let message = try await connection.receive()
                 switch message {
                 case .data(let data):
                     let serverMessage = try VolcengineProtocol.parseServerMessage(data)
                     guard let event = serverMessage.transcript else { continue }
+                    if !event.isFinal {
+                        guard event.text != lastPartialText else { continue }
+                        lastPartialText = event.text
+                    }
                     if case .terminated = continuation.yield(event) {
                         throw CancellationError()
                     }
                     if event.isFinal {
                         return .receiverFinished
                     }
-                case .string:
+                case .text:
                     throw VolcengineProviderError.unexpectedTextMessage
-                @unknown default:
-                    throw VolcengineProviderError.unexpectedTextMessage
+                case .closed:
+                    throw VolcengineProviderError.connectionClosed
                 }
             } catch {
                 if Task.isCancelled {
                     throw CancellationError()
-                }
-                if socket.task.closeCode == .normalClosure
-                    || socket.task.closeCode == .goingAway {
-                    return .receiverFinished
                 }
                 throw error
             }
