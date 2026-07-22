@@ -1,17 +1,52 @@
 import ApplicationServices
 import Foundation
 
+protocol ComposerDocument: AnyObject {
+    func isFocused(in processID: pid_t) throws -> Bool
+    func readValue() throws -> String
+    func writeValue(_ value: String) throws
+    func writeSelection(_ range: NSRange) throws
+}
+
 struct ComposerSeed {
-    let element: AXUIElement
+    let document: any ComposerDocument
     let processID: pid_t
     let originalValue: String
     let originalSelection: NSRange
+
+    init(
+        document: any ComposerDocument,
+        processID: pid_t,
+        originalValue: String,
+        originalSelection: NSRange
+    ) {
+        self.document = document
+        self.processID = processID
+        self.originalValue = originalValue
+        self.originalSelection = originalSelection
+    }
+
+    // Keep the test and internal callers that construct a seed from an AX
+    // element source-compatible while the editor works through ComposerDocument.
+    init(
+        element: AXUIElement,
+        processID: pid_t,
+        originalValue: String,
+        originalSelection: NSRange
+    ) {
+        self.init(
+            document: AXComposerDocument(element: element),
+            processID: processID,
+            originalValue: originalValue,
+            originalSelection: originalSelection
+        )
+    }
 }
 
 extension CodexComposerEditor {
     func liveCompositionSeed(processID: pid_t) throws -> ComposerSeed {
         let application = AXUIElementCreateApplication(processID)
-        let focusedRaw = try copyAttribute(
+        let focusedRaw = try Self.copyAttribute(
             kAXFocusedUIElementAttribute,
             from: application,
             missing: .noFocusedComposer
@@ -31,7 +66,7 @@ extension CodexComposerEditor {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
 
-        let valueRaw = try copyAttribute(
+        let valueRaw = try Self.copyAttribute(
             kAXValueAttribute,
             from: focused,
             missing: .focusedElementNotEditable
@@ -52,7 +87,7 @@ extension CodexComposerEditor {
     }
 
     func selectionRange(from element: AXUIElement) throws -> NSRange {
-        let raw = try copyAttribute(
+        let raw = try Self.copyAttribute(
             kAXSelectedTextRangeAttribute,
             from: element,
             missing: .invalidSelectionRange
@@ -73,7 +108,7 @@ extension CodexComposerEditor {
     }
 
     func boolAttribute(_ attribute: String, from element: AXUIElement) throws -> Bool {
-        let raw = try copyAttribute(
+        let raw = try Self.copyAttribute(
             attribute,
             from: element,
             missing: .focusedElementNotEditable
@@ -84,7 +119,7 @@ extension CodexComposerEditor {
         return number.boolValue
     }
 
-    func copyAttribute(
+    static func copyAttribute(
         _ attribute: String,
         from element: AXUIElement,
         missing: CodexInputBridgeError
@@ -105,7 +140,7 @@ extension CodexComposerEditor {
         return raw
     }
 
-    func setAttribute(
+    static func setAttribute(
         _ attribute: String,
         value: CFTypeRef,
         on element: AXUIElement
@@ -116,12 +151,12 @@ extension CodexComposerEditor {
         }
     }
 
-    func setSelection(_ range: NSRange, on element: AXUIElement) throws {
+    static func setSelection(_ range: NSRange, on element: AXUIElement) throws {
         var cfRange = CFRange(location: range.location, length: range.length)
         guard let value = AXValueCreate(.cfRange, &cfRange) else {
             throw CodexInputBridgeError.invalidSelectionRange
         }
-        try setAttribute(kAXSelectedTextRangeAttribute, value: value, on: element)
+        try Self.setAttribute(kAXSelectedTextRangeAttribute, value: value, on: element)
     }
 
     func valid(_ range: NSRange, in value: String) -> Bool {
@@ -132,5 +167,51 @@ extension CodexComposerEditor {
 
     func substring(_ value: String, range: NSRange) -> String {
         (value as NSString).substring(with: range)
+    }
+
+}
+
+private final class AXComposerDocument: ComposerDocument {
+    private let element: AXUIElement
+
+    init(element: AXUIElement) {
+        self.element = element
+    }
+
+    func isFocused(in processID: pid_t) throws -> Bool {
+        let application = AXUIElementCreateApplication(processID)
+        let focusedRaw = try CodexComposerEditor.copyAttribute(
+            kAXFocusedUIElementAttribute,
+            from: application,
+            missing: .noFocusedComposer
+        )
+        guard CFGetTypeID(focusedRaw) == AXUIElementGetTypeID() else {
+            return false
+        }
+        return CFEqual(focusedRaw, element)
+    }
+
+    func readValue() throws -> String {
+        let raw = try CodexComposerEditor.copyAttribute(
+            kAXValueAttribute,
+            from: element,
+            missing: .focusedElementNotEditable
+        )
+        guard let value = raw as? String else {
+            throw CodexInputBridgeError.focusedElementNotEditable
+        }
+        return value
+    }
+
+    func writeValue(_ value: String) throws {
+        try CodexComposerEditor.setAttribute(
+            kAXValueAttribute,
+            value: value as CFTypeRef,
+            on: element
+        )
+    }
+
+    func writeSelection(_ range: NSRange) throws {
+        try CodexComposerEditor.setSelection(range, on: element)
     }
 }

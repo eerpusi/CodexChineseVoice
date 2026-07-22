@@ -9,12 +9,13 @@ import Foundation
 /// an edit inside it is detected instead of being overwritten silently.
 public final class CodexComposerEditor: @unchecked Sendable {
     private struct Composition {
-        let element: AXUIElement
+        let document: any ComposerDocument
         let processID: pid_t
         let originalValue: String
         let originalSelection: NSRange
         var ownedRange: NSRange
         var lastPartial: String
+        var trackedValue: String
     }
 
     private let frontmostBundleIdentifier: () -> String?
@@ -90,12 +91,13 @@ public final class CodexComposerEditor: @unchecked Sendable {
 
         lock.lock()
         composition = Composition(
-            element: seed.element,
+            document: seed.document,
             processID: seed.processID,
             originalValue: seed.originalValue,
             originalSelection: selection,
             ownedRange: selection,
-            lastPartial: substring(seed.originalValue, range: selection)
+            lastPartial: substring(seed.originalValue, range: selection),
+            trackedValue: seed.originalValue
         )
         lock.unlock()
     }
@@ -113,16 +115,21 @@ public final class CodexComposerEditor: @unchecked Sendable {
         guard var active = composition else {
             throw CodexInputBridgeError.noActiveComposition
         }
-        try ensureFrontmost(active)
+        do {
+            try ensureFrontmost(active)
 
-        if text.isEmpty {
-            try restoreOriginal(&active)
+            if text.isEmpty {
+                try restoreOriginal(&active)
+            } else {
+                try replaceOwnedValue(&active, with: text)
+            }
             composition = nil
-            return
+        } catch {
+            // A value write can succeed before selection placement fails. Keep
+            // the latest owned range so cancel() can still restore it.
+            composition = active
+            throw error
         }
-
-        try replaceOwnedValue(&active, with: text)
-        composition = nil
     }
 
     /// Cancels the transaction and restores the original selected text.
@@ -132,9 +139,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
             lock.unlock()
             return
         }
-        // If focus was lost, avoid writing into an unrelated application.
-        if frontmostBundleIdentifier() == CodexHotkeyMonitor.codexBundleIdentifier,
-           frontmostProcessIdentifier() == active.processID {
+        if (try? active.document.isFocused(in: active.processID)) == true {
             try? restoreOriginal(&active)
         }
         composition = nil
@@ -151,9 +156,14 @@ public final class CodexComposerEditor: @unchecked Sendable {
         guard var active = composition else {
             throw CodexInputBridgeError.noActiveComposition
         }
-        try ensureFrontmost(active)
-        try replaceOwnedValue(&active, with: text)
-        if finish { composition = nil } else { composition = active }
+        do {
+            try ensureFrontmost(active)
+            try replaceOwnedValue(&active, with: text)
+            if finish { composition = nil } else { composition = active }
+        } catch {
+            composition = active
+            throw error
+        }
     }
 
     private func ensureFrontmost(_ active: Composition) throws {
@@ -161,48 +171,36 @@ public final class CodexComposerEditor: @unchecked Sendable {
               frontmostProcessIdentifier() == active.processID else {
             throw CodexInputBridgeError.codexNotFrontmost
         }
+        guard try active.document.isFocused(in: active.processID) else {
+            throw CodexInputBridgeError.noFocusedComposer
+        }
     }
 
     private func replaceOwnedValue(_ active: inout Composition, with text: String) throws {
-        let currentRaw = try copyAttribute(
-            kAXValueAttribute,
-            from: active.element,
-            missing: .focusedElementNotEditable
-        )
-        guard let current = currentRaw as? String,
-              valid(active.ownedRange, in: current),
-              substring(current, range: active.ownedRange) == active.lastPartial else {
-            throw CodexInputBridgeError.textChangedExternally
-        }
+        let current = try active.document.readValue()
+        try synchronizeOwnedRange(&active, current: current)
 
         let mutable = NSMutableString(string: current)
         mutable.replaceCharacters(in: active.ownedRange, with: text)
         let updated = String(mutable)
-        try setAttribute(kAXValueAttribute, value: updated as CFTypeRef, on: active.element)
+        try active.document.writeValue(updated)
 
         let insertion = NSRange(
             location: active.ownedRange.location + (NSString(string: text).length),
             length: 0
         )
-        try setSelection(insertion, on: active.element)
         active.ownedRange = NSRange(
             location: active.ownedRange.location,
             length: NSString(string: text).length
         )
         active.lastPartial = text
+        active.trackedValue = updated
+        try active.document.writeSelection(insertion)
     }
 
     private func restoreOriginal(_ active: inout Composition) throws {
-        let currentRaw = try copyAttribute(
-            kAXValueAttribute,
-            from: active.element,
-            missing: .focusedElementNotEditable
-        )
-        guard let current = currentRaw as? String,
-              valid(active.ownedRange, in: current),
-              substring(current, range: active.ownedRange) == active.lastPartial else {
-            throw CodexInputBridgeError.textChangedExternally
-        }
+        let current = try active.document.readValue()
+        try synchronizeOwnedRange(&active, current: current)
         let originalText = substring(
             active.originalValue,
             range: active.originalSelection
@@ -211,19 +209,32 @@ public final class CodexComposerEditor: @unchecked Sendable {
         mutable.replaceCharacters(in: active.ownedRange, with: originalText)
         let restored = String(mutable)
         if restored != current {
-            try setAttribute(
-                kAXValueAttribute,
-                value: restored as CFTypeRef,
-                on: active.element
-            )
+            try active.document.writeValue(restored)
         }
-        try setSelection(
-            NSRange(
-                location: active.ownedRange.location,
-                length: NSString(string: originalText).length
-            ),
-            on: active.element
+        let restoredRange = NSRange(
+            location: active.ownedRange.location,
+            length: NSString(string: originalText).length
         )
+        active.ownedRange = restoredRange
+        active.lastPartial = originalText
+        active.trackedValue = restored
+        try active.document.writeSelection(restoredRange)
+    }
+
+    private func synchronizeOwnedRange(
+        _ active: inout Composition,
+        current: String
+    ) throws {
+        guard let range = relocatedRange(
+            active.ownedRange,
+            from: active.trackedValue,
+            to: current
+        ), valid(range, in: current),
+            substring(current, range: range) == active.lastPartial else {
+            throw CodexInputBridgeError.textChangedExternally
+        }
+        active.ownedRange = range
+        active.trackedValue = current
     }
 
 }
