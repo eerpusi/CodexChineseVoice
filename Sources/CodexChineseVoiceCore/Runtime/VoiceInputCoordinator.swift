@@ -32,9 +32,12 @@ public final class VoiceInputCoordinator {
     private let report: @MainActor (String) -> Void
 
     private var sessionTask: Task<Void, Never>?
+    private var nextSessionID: UInt64 = 0
+    private var activeSessionID: UInt64?
     private var currentText = ""
     private var released = false
     private var didFinalize = false
+    private var providerDidFinish = false
 
     public init(
         hotkey: VoiceInputHotkeySource,
@@ -77,22 +80,27 @@ public final class VoiceInputCoordinator {
             currentText = ""
             released = false
             didFinalize = false
+            providerDidFinish = false
+            nextSessionID &+= 1
+            let sessionID = nextSessionID
+            activeSessionID = sessionID
             let provider = self.provider
             sessionTask = Task { [weak self] in
                 do {
                     for try await event in provider.events(audio: audioStream) {
                         guard !Task.isCancelled else { return }
-                        self?.receive(event)
+                        self?.receive(event, sessionID: sessionID)
                     }
-                    self?.providerFinished()
+                    self?.providerFinished(sessionID: sessionID)
                 } catch is CancellationError {
-                    self?.providerCancelled()
+                    self?.providerCancelled(sessionID: sessionID)
                 } catch {
-                    self?.providerFailed(error)
+                    self?.providerFailed(error, sessionID: sessionID)
                 }
             }
         } catch {
             report("无法开始录音：\(error.localizedDescription)")
+            audio.stop()
             composer.cancel()
         }
     }
@@ -101,9 +109,13 @@ public final class VoiceInputCoordinator {
         guard sessionTask != nil else { return }
         released = true
         audio.stop()
+        if providerDidFinish {
+            finishReleasedSession()
+        }
     }
 
-    private func receive(_ event: TranscriptEvent) {
+    private func receive(_ event: TranscriptEvent, sessionID: UInt64) {
+        guard activeSessionID == sessionID else { return }
         currentText = event.text
         do {
             if event.isFinal {
@@ -118,8 +130,14 @@ public final class VoiceInputCoordinator {
         }
     }
 
-    private func providerFinished() {
+    private func providerFinished(sessionID: UInt64) {
+        guard activeSessionID == sessionID else { return }
+        providerDidFinish = true
         guard released else { return }
+        finishReleasedSession()
+    }
+
+    private func finishReleasedSession() {
         if !didFinalize && !currentText.isEmpty {
             do {
                 try composer.finalize(currentText)
@@ -127,17 +145,23 @@ public final class VoiceInputCoordinator {
                 report("无法完成 Codex 输入：\(error.localizedDescription)")
                 composer.cancel()
             }
+        } else if !didFinalize {
+            composer.cancel()
         }
         clearSession()
     }
 
-    private func providerCancelled() {
-        if !released { composer.cancel() }
+    private func providerCancelled(sessionID: UInt64) {
+        guard activeSessionID == sessionID else { return }
+        audio.stop()
+        if !didFinalize { composer.cancel() }
         clearSession()
     }
 
-    private func providerFailed(_ error: Error) {
+    private func providerFailed(_ error: Error, sessionID: UInt64) {
+        guard activeSessionID == sessionID else { return }
         report("语音识别失败：\(error.localizedDescription)")
+        audio.stop()
         composer.cancel()
         clearSession()
     }
@@ -152,8 +176,10 @@ public final class VoiceInputCoordinator {
 
     private func clearSession() {
         sessionTask = nil
+        activeSessionID = nil
         currentText = ""
         released = false
         didFinalize = false
+        providerDidFinish = false
     }
 }
