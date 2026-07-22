@@ -41,9 +41,10 @@ terminal session that launches the utility when possible.
 
 ## macOS permissions
 
-The first run requires Microphone and Accessibility permission. Enable them for the terminal or
-installed executable in **System Settings > Privacy & Security**. The utility does not modify
-these settings or send an automatic message.
+The first run requests Microphone permission and opens the macOS Accessibility authorization
+prompt when needed. Grant access to the terminal or installed executable in **System Settings >
+Privacy & Security**, then run the command again. The utility does not change these settings or
+send an automatic message.
 
 ## Current status
 

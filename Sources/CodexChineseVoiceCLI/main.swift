@@ -24,6 +24,25 @@ struct CodexChineseVoiceCLI {
             exit(2)
         }
 
+        do {
+            try await PermissionPreflight(
+                provider: SystemPermissionProvider()
+            ).ensureReady()
+        } catch PermissionPreflightError.microphoneDenied {
+            writeError(
+                "麦克风权限未开启。请在系统设置 > 隐私与安全性 > 麦克风中允许本程序，然后重新运行。"
+            )
+            exit(3)
+        } catch PermissionPreflightError.accessibilityRequired {
+            writeError(
+                "需要辅助功能权限才能监听 Command+R 并写入 Codex。请在系统设置中授权后重新运行。"
+            )
+            exit(4)
+        } catch {
+            writeError("检查 macOS 权限失败：\(error.localizedDescription)")
+            exit(3)
+        }
+
         let coordinator = await MainActor.run {
             VoiceInputCoordinator(
                 hotkey: CodexHotkeyMonitor(),
