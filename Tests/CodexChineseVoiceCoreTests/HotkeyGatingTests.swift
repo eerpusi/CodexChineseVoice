@@ -40,4 +40,37 @@ final class HotkeyGatingTests: XCTestCase {
             )
         )
     }
+
+    func testCapturedCommandRConsumesAutoRepeatUntilKeyUp() throws {
+        let monitor = CodexHotkeyMonitor {
+            CodexHotkeyMonitor.codexBundleIdentifier
+        }
+        let keyDown = try keyboardEvent(keyDown: true)
+        XCTAssertNil(monitor.handle(type: .keyDown, event: keyDown))
+
+        let repeatedKeyDown = try keyboardEvent(keyDown: true, isAutoRepeat: true)
+        XCTAssertNil(monitor.handle(type: .keyDown, event: repeatedKeyDown))
+
+        let keyUp = try keyboardEvent(keyDown: false)
+        XCTAssertNil(monitor.handle(type: .keyUp, event: keyUp))
+    }
+
+    private func keyboardEvent(
+        keyDown: Bool,
+        isAutoRepeat: Bool = false
+    ) throws -> CGEvent {
+        let event = try XCTUnwrap(
+            CGEvent(
+                keyboardEventSource: nil,
+                virtualKey: CodexHotkeyMonitor.commandRKeyCode,
+                keyDown: keyDown
+            )
+        )
+        event.flags = [.maskCommand]
+        event.setIntegerValueField(
+            .keyboardEventAutorepeat,
+            value: isAutoRepeat ? 1 : 0
+        )
+        return event
+    }
 }

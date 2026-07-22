@@ -20,6 +20,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
     private let frontmostBundleIdentifier: () -> String?
     private let frontmostProcessIdentifier: () -> pid_t?
     private let accessibilityTrusted: () -> Bool
+    private let compositionSeed: ((pid_t) throws -> ComposerSeed)?
     private let lock = NSLock()
     private var composition: Composition?
 
@@ -35,6 +36,19 @@ public final class CodexComposerEditor: @unchecked Sendable {
         self.frontmostBundleIdentifier = frontmostBundleIdentifier
         self.frontmostProcessIdentifier = frontmostProcessIdentifier
         self.accessibilityTrusted = accessibilityTrusted
+        compositionSeed = nil
+    }
+
+    init(
+        frontmostBundleIdentifier: @escaping () -> String?,
+        frontmostProcessIdentifier: @escaping () -> pid_t?,
+        accessibilityTrusted: @escaping () -> Bool,
+        compositionSeed: @escaping (pid_t) throws -> ComposerSeed
+    ) {
+        self.frontmostBundleIdentifier = frontmostBundleIdentifier
+        self.frontmostProcessIdentifier = frontmostProcessIdentifier
+        self.accessibilityTrusted = accessibilityTrusted
+        self.compositionSeed = compositionSeed
     }
 
     public var isActive: Bool {
@@ -62,53 +76,26 @@ public final class CodexComposerEditor: @unchecked Sendable {
             throw CodexInputBridgeError.noFocusedComposer
         }
 
-        let application = AXUIElementCreateApplication(processID)
-        let focusedRaw: CFTypeRef
-        do {
-            focusedRaw = try copyAttribute(
-                kAXFocusedUIElementAttribute,
-                from: application,
-                missing: .noFocusedComposer
-            )
-        } catch {
-            throw error
+        let seed: ComposerSeed
+        if let compositionSeed {
+            seed = try compositionSeed(processID)
+        } else {
+            seed = try liveCompositionSeed(processID: processID)
         }
-        guard CFGetTypeID(focusedRaw) == AXUIElementGetTypeID() else {
-            throw CodexInputBridgeError.noFocusedComposer
-        }
-        let focused = focusedRaw as! AXUIElement
-
-        var focusedProcessID: pid_t = 0
-        let pidStatus = AXUIElementGetPid(focused, &focusedProcessID)
-        guard pidStatus == .success, focusedProcessID == processID else {
-            throw CodexInputBridgeError.noFocusedComposer
-        }
-
-        if let editable = try? boolAttribute(kAXIsEditableAttribute, from: focused), !editable {
-            throw CodexInputBridgeError.focusedElementNotEditable
-        }
-
-        let valueRaw = try copyAttribute(
-            kAXValueAttribute,
-            from: focused,
-            missing: .focusedElementNotEditable
-        )
-        guard let value = valueRaw as? String else {
-            throw CodexInputBridgeError.focusedElementNotEditable
-        }
-        let selection = try selectionRange(from: focused)
-        guard valid(selection, in: value) else {
+        let selection = seed.originalSelection
+        guard seed.processID == processID,
+              valid(selection, in: seed.originalValue) else {
             throw CodexInputBridgeError.invalidSelectionRange
         }
 
         lock.lock()
         composition = Composition(
-            element: focused,
-            processID: processID,
-            originalValue: value,
+            element: seed.element,
+            processID: seed.processID,
+            originalValue: seed.originalValue,
             originalSelection: selection,
             ownedRange: selection,
-            lastPartial: substring(value, range: selection)
+            lastPartial: substring(seed.originalValue, range: selection)
         )
         lock.unlock()
     }
@@ -122,8 +109,8 @@ public final class CodexComposerEditor: @unchecked Sendable {
     /// back to the value and selection captured by `begin`.
     public func finalize(_ text: String) throws {
         lock.lock()
+        defer { lock.unlock() }
         guard var active = composition else {
-            lock.unlock()
             throw CodexInputBridgeError.noActiveComposition
         }
         try ensureFrontmost(active)
@@ -131,13 +118,11 @@ public final class CodexComposerEditor: @unchecked Sendable {
         if text.isEmpty {
             try restoreOriginal(&active)
             composition = nil
-            lock.unlock()
             return
         }
 
         try replaceOwnedValue(&active, with: text)
         composition = nil
-        lock.unlock()
     }
 
     /// Cancels the transaction and restores the original selected text.

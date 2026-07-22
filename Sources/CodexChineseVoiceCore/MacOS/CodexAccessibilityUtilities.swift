@@ -1,7 +1,56 @@
 import ApplicationServices
 import Foundation
 
+struct ComposerSeed {
+    let element: AXUIElement
+    let processID: pid_t
+    let originalValue: String
+    let originalSelection: NSRange
+}
+
 extension CodexComposerEditor {
+    func liveCompositionSeed(processID: pid_t) throws -> ComposerSeed {
+        let application = AXUIElementCreateApplication(processID)
+        let focusedRaw = try copyAttribute(
+            kAXFocusedUIElementAttribute,
+            from: application,
+            missing: .noFocusedComposer
+        )
+        guard CFGetTypeID(focusedRaw) == AXUIElementGetTypeID() else {
+            throw CodexInputBridgeError.noFocusedComposer
+        }
+        let focused = focusedRaw as! AXUIElement
+
+        var focusedProcessID: pid_t = 0
+        let pidStatus = AXUIElementGetPid(focused, &focusedProcessID)
+        guard pidStatus == .success, focusedProcessID == processID else {
+            throw CodexInputBridgeError.noFocusedComposer
+        }
+
+        if let editable = try? boolAttribute(kAXIsEditableAttribute, from: focused), !editable {
+            throw CodexInputBridgeError.focusedElementNotEditable
+        }
+
+        let valueRaw = try copyAttribute(
+            kAXValueAttribute,
+            from: focused,
+            missing: .focusedElementNotEditable
+        )
+        guard let value = valueRaw as? String else {
+            throw CodexInputBridgeError.focusedElementNotEditable
+        }
+        let selection = try selectionRange(from: focused)
+        guard valid(selection, in: value) else {
+            throw CodexInputBridgeError.invalidSelectionRange
+        }
+        return ComposerSeed(
+            element: focused,
+            processID: processID,
+            originalValue: value,
+            originalSelection: selection
+        )
+    }
+
     func selectionRange(from element: AXUIElement) throws -> NSRange {
         let raw = try copyAttribute(
             kAXSelectedTextRangeAttribute,
