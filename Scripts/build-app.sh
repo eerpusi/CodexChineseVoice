@@ -9,6 +9,7 @@ OUTPUT_DIR="${ROOT_DIR}/.build/release-artifacts"
 APP_DIR="${OUTPUT_DIR}/${APP_NAME}"
 APP_BINARY="${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}"
 CLI_BINARY="${APP_DIR}/Contents/Helpers/${CLI_NAME}"
+APP_ICON="${APP_DIR}/Contents/Resources/AppIcon.icns"
 ZIP_PATH="${OUTPUT_DIR}/${PRODUCT_NAME}-macos.zip"
 CHECKSUM_PATH="${OUTPUT_DIR}/${PRODUCT_NAME}-macos.sha256"
 UNSIGNED=0
@@ -29,6 +30,8 @@ if [[ "${CHECK_ONLY}" -eq 1 ]]; then
     test "$(plutil -extract CFBundleIdentifier raw -o - "${APP_DIR}/Contents/Info.plist")" = "com.lianenguang.CodexChineseVoice"
     test -x "${APP_BINARY}"
     test -x "${CLI_BINARY}"
+    test -f "${APP_ICON}"
+    test "$(plutil -extract CFBundleIconFile raw -o - "${APP_DIR}/Contents/Info.plist")" = "AppIcon"
     test "$(lipo -archs "${APP_BINARY}" | tr ' ' '\n' | sort | tr '\n' ' ')" = "arm64 x86_64 "
     test "$(lipo -archs "${CLI_BINARY}" | tr ' ' '\n' | sort | tr '\n' ' ')" = "arm64 x86_64 "
     codesign --verify --deep --strict "${APP_DIR}"
@@ -53,9 +56,10 @@ BUILT_CLI_BINARY="${BIN_DIR}/${CLI_NAME}"
 [[ -x "${BUILT_APP_BINARY}" ]] || { echo "missing built executable: ${BUILT_APP_BINARY}" >&2; exit 1; }
 [[ -x "${BUILT_CLI_BINARY}" ]] || { echo "missing built executable: ${BUILT_CLI_BINARY}" >&2; exit 1; }
 
-mkdir -p "${APP_DIR}/Contents/MacOS" "${APP_DIR}/Contents/Helpers"
+mkdir -p "${APP_DIR}/Contents/MacOS" "${APP_DIR}/Contents/Helpers" "${APP_DIR}/Contents/Resources"
 cp "${BUILT_APP_BINARY}" "${APP_BINARY}"
 cp "${BUILT_CLI_BINARY}" "${CLI_BINARY}"
+cp "${ROOT_DIR}/Packaging/AppIcon.icns" "${APP_ICON}"
 cp "${ROOT_DIR}/Packaging/Info.plist" "${APP_DIR}/Contents/Info.plist"
 chmod 755 "${APP_BINARY}" "${CLI_BINARY}"
 plutil -lint "${APP_DIR}/Contents/Info.plist" >/dev/null

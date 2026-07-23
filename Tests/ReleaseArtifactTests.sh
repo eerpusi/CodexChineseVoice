@@ -12,13 +12,16 @@ ditto -x -k "${ARCHIVE}" "${TEMP_DIR}"
 APP="${TEMP_DIR}/CodexChineseVoice.app"
 APP_BINARY="${APP}/Contents/MacOS/CodexChineseVoice"
 CLI_BINARY="${APP}/Contents/Helpers/codex-chinese-voice"
+APP_ICON="${APP}/Contents/Resources/AppIcon.icns"
 
 [[ -x "${APP_BINARY}" ]] || { echo "missing app executable" >&2; exit 1; }
 [[ -x "${CLI_BINARY}" ]] || { echo "missing bundled CLI executable" >&2; exit 1; }
+[[ -f "${APP_ICON}" ]] || { echo "missing app icon" >&2; exit 1; }
 
 test "$(lipo -archs "${APP_BINARY}" | tr ' ' '\n' | sort | tr '\n' ' ')" = "arm64 x86_64 "
 test "$(lipo -archs "${CLI_BINARY}" | tr ' ' '\n' | sort | tr '\n' ' ')" = "arm64 x86_64 "
 test "$(plutil -extract CFBundleIdentifier raw -o - "${APP}/Contents/Info.plist")" = "com.lianenguang.CodexChineseVoice"
+test "$(plutil -extract CFBundleIconFile raw -o - "${APP}/Contents/Info.plist")" = "AppIcon"
 plutil -extract NSMicrophoneUsageDescription raw -o - "${APP}/Contents/Info.plist" >/dev/null
 
 codesign --verify --deep --strict "${APP}"
