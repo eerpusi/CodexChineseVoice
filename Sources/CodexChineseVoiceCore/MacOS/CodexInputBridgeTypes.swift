@@ -12,6 +12,7 @@ public enum CodexInputBridgeError: Error, LocalizedError, Equatable, Sendable {
     case invalidSelectionRange
     case textChangedExternally
     case noActiveComposition
+    case autoSubmitUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -35,6 +36,8 @@ public enum CodexInputBridgeError: Error, LocalizedError, Equatable, Sendable {
             "ChatGPT 输入框内容已发生变化，请重新开始录音"
         case .noActiveComposition:
             "当前没有可编辑的语音会话"
+        case .autoSubmitUnavailable:
+            "无法创建自动发送按键事件"
         }
     }
 }

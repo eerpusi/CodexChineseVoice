@@ -11,7 +11,8 @@ integration or release checkpoints.
 - The shortcut is active only while the Codex desktop app is frontmost.
 - Holding `Command+R` records; releasing it finalizes transcription.
 - Partial transcripts update the current Codex composer; final text replaces the active partial.
-- The tool must never send the message automatically.
+- The tool sends only after a successful final transcription when the user-controlled auto-send
+  setting is enabled; the setting defaults to enabled.
 
 ## Security
 

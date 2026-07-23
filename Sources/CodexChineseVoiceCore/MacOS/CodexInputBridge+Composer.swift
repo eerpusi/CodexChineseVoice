@@ -22,6 +22,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
     private let frontmostProcessIdentifier: () -> pid_t?
     private let accessibilityTrusted: () -> Bool
     private let compositionSeed: ((pid_t) throws -> ComposerSeed)?
+    private let submitMessage: (_ validate: () throws -> Void) throws -> Void
     private let lock = NSLock()
     private var composition: Composition?
 
@@ -38,18 +39,25 @@ public final class CodexComposerEditor: @unchecked Sendable {
         self.frontmostProcessIdentifier = frontmostProcessIdentifier
         self.accessibilityTrusted = accessibilityTrusted
         compositionSeed = nil
+        submitMessage = { validate in
+            try CodexMessageSubmitter().submit(validate: validate)
+        }
     }
 
     init(
         frontmostBundleIdentifier: @escaping () -> String?,
         frontmostProcessIdentifier: @escaping () -> pid_t?,
         accessibilityTrusted: @escaping () -> Bool,
-        compositionSeed: @escaping (pid_t) throws -> ComposerSeed
+        compositionSeed: @escaping (pid_t) throws -> ComposerSeed,
+        submitMessage: @escaping (_ validate: () throws -> Void) throws -> Void = {
+            validate in try validate()
+        }
     ) {
         self.frontmostBundleIdentifier = frontmostBundleIdentifier
         self.frontmostProcessIdentifier = frontmostProcessIdentifier
         self.accessibilityTrusted = accessibilityTrusted
         self.compositionSeed = compositionSeed
+        self.submitMessage = submitMessage
     }
 
     public var isActive: Bool {
@@ -110,9 +118,15 @@ public final class CodexComposerEditor: @unchecked Sendable {
     /// Replaces the owned partial with the final result. An empty final rolls
     /// back to the value and selection captured by `begin`.
     public func finalize(_ text: String) throws {
+        try complete(text, submit: false)
+    }
+
+    /// Replaces the owned partial with the final result and optionally submits
+    /// the completed composer after the transaction has been cleared.
+    public func complete(_ text: String, submit shouldSubmit: Bool) throws {
         lock.lock()
-        defer { lock.unlock() }
         guard var active = composition else {
+            lock.unlock()
             throw CodexInputBridgeError.noActiveComposition
         }
         do {
@@ -123,12 +137,21 @@ public final class CodexComposerEditor: @unchecked Sendable {
             } else {
                 try replaceOwnedValue(&active, with: text)
             }
+            if shouldSubmit && !text.isEmpty {
+                try ensureFrontmost(active)
+            }
             composition = nil
+            lock.unlock()
         } catch {
             // A value write can succeed before selection placement fails. Keep
             // the latest owned range so cancel() can still restore it.
             composition = active
+            lock.unlock()
             throw error
+        }
+
+        if shouldSubmit && !text.isEmpty {
+            try submitMessage { try ensureFrontmost(active) }
         }
     }
 

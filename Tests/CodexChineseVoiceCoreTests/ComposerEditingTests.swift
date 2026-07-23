@@ -59,6 +59,121 @@ final class ComposerEditingTests: XCTestCase {
         }
     }
 
+    func testCompletionWritesFinalTextBeforeSubmitting() throws {
+        let frontmost = FrontmostState()
+        let document = MemoryComposerDocument(value: "已有文字")
+        var submittedValues: [String] = []
+        let editor = makeEditor(
+            document: document,
+            originalValue: document.value,
+            selection: NSRange(location: 4, length: 0),
+            frontmost: frontmost,
+            submitMessage: { validate in
+                try validate()
+                submittedValues.append(document.value)
+            }
+        )
+
+        try editor.begin()
+        try editor.replacePartial("临时")
+        try editor.complete("最终语音", submit: true)
+
+        XCTAssertEqual(document.value, "已有文字最终语音")
+        XCTAssertEqual(submittedValues, ["已有文字最终语音"])
+        XCTAssertFalse(editor.isActive)
+    }
+
+    func testCompletionCanLeaveFinalTextUnsubmitted() throws {
+        let frontmost = FrontmostState()
+        let document = MemoryComposerDocument(value: "已有文字")
+        var submitCount = 0
+        let editor = makeEditor(
+            document: document,
+            originalValue: document.value,
+            selection: NSRange(location: 4, length: 0),
+            frontmost: frontmost,
+            submitMessage: { _ in submitCount += 1 }
+        )
+
+        try editor.begin()
+        try editor.complete("最终语音", submit: false)
+
+        XCTAssertEqual(document.value, "已有文字最终语音")
+        XCTAssertEqual(submitCount, 0)
+        XCTAssertFalse(editor.isActive)
+    }
+
+    func testSubmissionFailureLeavesFinalTextAndClearsSession() throws {
+        let frontmost = FrontmostState()
+        let document = MemoryComposerDocument(value: "已有文字")
+        let editor = makeEditor(
+            document: document,
+            originalValue: document.value,
+            selection: NSRange(location: 4, length: 0),
+            frontmost: frontmost,
+            submitMessage: { validate in
+                try validate()
+                throw TestDocumentError.submissionFailed
+            }
+        )
+
+        try editor.begin()
+
+        XCTAssertThrowsError(try editor.complete("最终语音", submit: true))
+        XCTAssertEqual(document.value, "已有文字最终语音")
+        XCTAssertFalse(editor.isActive)
+    }
+
+    func testCompletionDoesNotWriteOrSubmitAfterComposerLosesFocus() throws {
+        let frontmost = FrontmostState()
+        let document = MemoryComposerDocument(value: "已有文字")
+        var submitCount = 0
+        let editor = makeEditor(
+            document: document,
+            originalValue: document.value,
+            selection: NSRange(location: 4, length: 0),
+            frontmost: frontmost,
+            submitMessage: { _ in submitCount += 1 }
+        )
+
+        try editor.begin()
+        try editor.replacePartial("临时")
+        document.isFocused = false
+
+        XCTAssertThrowsError(try editor.complete("最终语音", submit: true)) { error in
+            XCTAssertEqual(error as? CodexInputBridgeError, .noFocusedComposer)
+        }
+        XCTAssertEqual(document.value, "已有文字临时")
+        XCTAssertEqual(submitCount, 0)
+        XCTAssertTrue(editor.isActive)
+    }
+
+    func testSubmissionBoundaryRechecksFocusBeforePosting() throws {
+        let frontmost = FrontmostState()
+        let document = MemoryComposerDocument(value: "已有文字")
+        var submitCount = 0
+        let editor = makeEditor(
+            document: document,
+            originalValue: document.value,
+            selection: NSRange(location: 4, length: 0),
+            frontmost: frontmost,
+            submitMessage: { validate in
+                document.isFocused = false
+                try validate()
+                submitCount += 1
+            }
+        )
+
+        try editor.begin()
+
+        XCTAssertThrowsError(try editor.complete("最终语音", submit: true)) { error in
+            XCTAssertEqual(error as? CodexInputBridgeError, .noFocusedComposer)
+        }
+        XCTAssertEqual(document.value, "已有文字最终语音")
+        XCTAssertEqual(submitCount, 0)
+        XCTAssertFalse(editor.isActive)
+    }
+
     func testCancelRestoresOriginalSelectionAndClearsSession() throws {
         let frontmost = FrontmostState()
         let document = MemoryComposerDocument(value: "前缀原文后缀")
@@ -325,7 +440,10 @@ final class ComposerEditingTests: XCTestCase {
         document: MemoryComposerDocument,
         originalValue: String,
         selection: NSRange,
-        frontmost: FrontmostState
+        frontmost: FrontmostState,
+        submitMessage: @escaping (_ validate: () throws -> Void) throws -> Void = {
+            validate in try validate()
+        }
     ) -> CodexComposerEditor {
         CodexComposerEditor(
             frontmostBundleIdentifier: { frontmost.bundleIdentifier },
@@ -338,7 +456,8 @@ final class ComposerEditingTests: XCTestCase {
                     originalValue: originalValue,
                     originalSelection: selection
                 )
-            }
+            },
+            submitMessage: submitMessage
         )
     }
 }
@@ -391,4 +510,5 @@ private final class MemoryComposerDocument: ComposerDocument {
 
 private enum TestDocumentError: Error {
     case selectionWriteFailed
+    case submissionFailed
 }

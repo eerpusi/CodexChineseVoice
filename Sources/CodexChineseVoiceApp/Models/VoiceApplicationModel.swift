@@ -86,6 +86,9 @@ final class VoiceApplicationModel {
                 audio: audio,
                 provider: VolcengineProvider(apiKey: configuration.apiKey),
                 composer: CodexComposerEditor(),
+                autoSendEnabled: {
+                    AppPresentationPreferences.load().autoSendsTranscription
+                },
                 report: { [weak self] message in
                     self?.state = .failed(.runtime(message))
                 }

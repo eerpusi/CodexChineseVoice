@@ -32,6 +32,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(harness.audio.stopCount, 1)
         XCTAssertEqual(harness.composer.cancelCount, 1)
+        XCTAssertTrue(harness.composer.completions.isEmpty)
 
         harness.hotkey.send(.began)
         try await waitUntil { harness.provider.sessionCount == 2 }
@@ -54,6 +55,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(harness.audio.stopCount, 1)
         XCTAssertEqual(harness.composer.cancelCount, 1)
+        XCTAssertTrue(harness.composer.completions.isEmpty)
 
         await harness.stop()
     }
@@ -73,6 +75,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         try await waitUntil { harness.audio.stopCount == 2 }
 
         XCTAssertEqual(harness.composer.cancelCount, 1)
+        XCTAssertTrue(harness.composer.completions.isEmpty)
 
         await harness.stop()
     }
@@ -91,13 +94,13 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         let startedAgain = await eventually { harness.provider.sessionCount == 2 }
         XCTAssertTrue(startedAgain)
         XCTAssertTrue(harness.composer.partials.isEmpty)
-        XCTAssertTrue(harness.composer.finals.isEmpty)
+        XCTAssertTrue(harness.composer.completions.isEmpty)
         XCTAssertEqual(harness.composer.cancelCount, 1)
 
         await harness.stop()
     }
 
-    func testProviderFinalBeforeReleaseConvergesOnKeyUpAndAllowsNextSession() async throws {
+    func testCompletedSessionSubmitsByDefaultExactlyOnce() async throws {
         let harness = CoordinatorHarness()
         try await harness.start()
 
@@ -105,16 +108,20 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         try await waitUntil { harness.provider.sessionCount == 1 }
         harness.provider.send(TranscriptEvent(text: "完成", isFinal: true), session: 0)
         harness.provider.finish(session: 0)
-        try await waitUntil { harness.composer.finals == ["完成"] }
+        try await waitUntil { harness.composer.partials == ["完成"] }
         try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(harness.composer.completions.isEmpty)
 
         harness.hotkey.send(.ended)
-        try await waitUntil { harness.audio.stopCount == 1 }
+        try await waitUntil { harness.composer.completions.count == 1 }
         harness.hotkey.send(.began)
         let startedAgain = await eventually { harness.provider.sessionCount == 2 }
 
         XCTAssertTrue(startedAgain)
-        XCTAssertEqual(harness.composer.finals, ["完成"])
+        XCTAssertEqual(
+            harness.composer.completions,
+            [CoordinatorCompletion(text: "完成", submit: true)]
+        )
 
         await harness.stop()
     }
@@ -132,11 +139,53 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         try await waitUntil { harness.audio.stopCount == 1 }
         harness.provider.send(TranscriptEvent(text: "你好", isFinal: true), session: 0)
         harness.provider.finish(session: 0)
-        try await waitUntil { harness.composer.finals == ["你好"] }
+        try await waitUntil { harness.composer.completions.count == 1 }
 
-        XCTAssertEqual(harness.composer.partials, ["你"])
-        XCTAssertEqual(harness.composer.finals, ["你好"])
+        XCTAssertEqual(harness.composer.partials, ["你", "你好"])
+        XCTAssertEqual(
+            harness.composer.completions,
+            [CoordinatorCompletion(text: "你好", submit: true)]
+        )
         XCTAssertEqual(harness.composer.cancelCount, 0)
+
+        await harness.stop()
+    }
+
+    func testPartialWithoutFinalNeverSubmitsWhenProviderFinishes() async throws {
+        let harness = CoordinatorHarness()
+        try await harness.start()
+
+        harness.hotkey.send(.began)
+        try await waitUntil { harness.provider.sessionCount == 1 }
+        harness.provider.send(TranscriptEvent(text: "未确认", isFinal: false), session: 0)
+        try await waitUntil { harness.composer.partials == ["未确认"] }
+        harness.hotkey.send(.ended)
+        harness.provider.finish(session: 0)
+        try await waitUntil {
+            harness.composer.cancelCount == 1 || !harness.composer.completions.isEmpty
+        }
+
+        XCTAssertTrue(harness.composer.completions.isEmpty)
+        XCTAssertEqual(harness.composer.cancelCount, 1)
+
+        await harness.stop()
+    }
+
+    func testDisabledPreferenceCompletesWithoutSubmitting() async throws {
+        let harness = CoordinatorHarness(autoSendEnabled: { false })
+        try await harness.start()
+
+        harness.hotkey.send(.began)
+        try await waitUntil { harness.provider.sessionCount == 1 }
+        harness.hotkey.send(.ended)
+        harness.provider.send(TranscriptEvent(text: "最终", isFinal: true), session: 0)
+        harness.provider.finish(session: 0)
+        try await waitUntil { harness.composer.completions.count == 1 }
+
+        XCTAssertEqual(
+            harness.composer.completions,
+            [CoordinatorCompletion(text: "最终", submit: false)]
+        )
 
         await harness.stop()
     }
@@ -231,7 +280,8 @@ private final class CoordinatorHarness {
 
     init(
         audio: CoordinatorAudioSource = CoordinatorAudioSource(),
-        provider: CoordinatorProvider = CoordinatorProvider()
+        provider: CoordinatorProvider = CoordinatorProvider(),
+        autoSendEnabled: @escaping @MainActor () -> Bool = { true }
     ) {
         self.audio = audio
         self.provider = provider
@@ -239,7 +289,8 @@ private final class CoordinatorHarness {
             hotkey: hotkey,
             audio: audio,
             provider: provider,
-            composer: composer
+            composer: composer,
+            autoSendEnabled: autoSendEnabled
         )
     }
 
@@ -382,18 +433,23 @@ private final class CoordinatorProvider: ASRProvider, @unchecked Sendable {
     }
 }
 
+private struct CoordinatorCompletion: Equatable {
+    let text: String
+    let submit: Bool
+}
+
 private final class CoordinatorComposer: VoiceInputComposer, @unchecked Sendable {
     private let lock = NSLock()
     private var partialError: Error?
     private var firstCancelCallback: (@Sendable () -> Void)?
     private var begins = 0
     private var partialValues: [String] = []
-    private var finalValues: [String] = []
+    private var completionValues: [CoordinatorCompletion] = []
     private var cancels = 0
 
     var beginCount: Int { lock.withLock { begins } }
     var partials: [String] { lock.withLock { partialValues } }
-    var finals: [String] { lock.withLock { finalValues } }
+    var completions: [CoordinatorCompletion] { lock.withLock { completionValues } }
     var cancelCount: Int { lock.withLock { cancels } }
 
     init(
@@ -417,8 +473,10 @@ private final class CoordinatorComposer: VoiceInputComposer, @unchecked Sendable
         if let error { throw error }
     }
 
-    func finalize(_ text: String) throws {
-        lock.withLock { finalValues.append(text) }
+    func complete(_ text: String, submit: Bool) throws {
+        lock.withLock {
+            completionValues.append(CoordinatorCompletion(text: text, submit: submit))
+        }
     }
 
     func cancel() {

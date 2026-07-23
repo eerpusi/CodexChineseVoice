@@ -3,6 +3,8 @@ import SwiftUI
 
 struct AppSettingsView: View {
     let model: VoiceApplicationModel
+    @AppStorage(AppPresentationPreferences.autoSendsTranscriptionKey)
+    private var autoSendsTranscription = true
     @AppStorage(AppPresentationPreferences.showsDockIconKey)
     private var showsDockIcon = true
     @State private var apiKey = ""
@@ -12,6 +14,7 @@ struct AppSettingsView: View {
     var body: some View {
         Form {
             Section("应用") {
+                Toggle("转写完成后自动发送", isOn: $autoSendsTranscription)
                 Toggle("在 Dock 中显示", isOn: $showsDockIcon)
             }
 
