@@ -100,6 +100,59 @@ enum SecureFileAccessIO {
         return fileFD
     }
 
+    static func openLockFile(
+        _ name: String,
+        relativeTo parentFD: Int32
+    ) throws -> Int32 {
+        let flags = O_RDWR | O_CLOEXEC | O_NOFOLLOW
+        var created = false
+        var fileFD = name.withCString {
+            openat(parentFD, $0, flags | O_CREAT | O_EXCL, mode_t(0o600))
+        }
+        if fileFD >= 0 {
+            created = true
+        } else {
+            guard errno == EEXIST else {
+                throw SecureFileAccessError.unreadable
+            }
+            fileFD = name.withCString { openat(parentFD, $0, flags) }
+        }
+        guard fileFD >= 0 else {
+            throw SecureFileAccessError.unreadable
+        }
+
+        var info = stat()
+        let valid = fstat(fileFD, &info) == 0
+            && info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
+        guard valid else {
+            close(fileFD)
+            throw SecureFileAccessError.unreadable
+        }
+        if created, fchmod(fileFD, mode_t(0o600)) != 0 {
+            close(fileFD)
+            throw SecureFileAccessError.unreadable
+        }
+        guard info.st_mode & 0o777 == 0o600 || created else {
+            close(fileFD)
+            throw SecureFileAccessError.unreadable
+        }
+        return fileFD
+    }
+
+    static func lockExclusive(_ fileFD: Int32) throws {
+        while flock(fileFD, LOCK_EX) != 0 {
+            if errno == EINTR { continue }
+            throw SecureFileAccessError.unreadable
+        }
+    }
+
+    static func unlock(_ fileFD: Int32) {
+        while flock(fileFD, LOCK_UN) != 0 {
+            if errno == EINTR { continue }
+            return
+        }
+    }
+
     static func readAll(from fileFD: Int32) throws -> Data {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)

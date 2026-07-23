@@ -8,6 +8,20 @@ protocol ComposerDocument: AnyObject {
     func writeSelection(_ range: NSRange) throws
 }
 
+enum CodexAccessibilityErrorMapping {
+    static func map(
+        status: AXError,
+        missing: CodexInputBridgeError
+    ) -> CodexInputBridgeError {
+        switch status {
+        case .cannotComplete, .notImplemented, .noValue, .attributeUnsupported:
+            missing
+        default:
+            .accessibilityFailure(Int32(status.rawValue))
+        }
+    }
+}
+
 struct ComposerSeed {
     let document: any ComposerDocument
     let processID: pid_t
@@ -46,9 +60,88 @@ struct ComposerSeed {
 extension CodexComposerEditor {
     func liveCompositionSeed(processID: pid_t) throws -> ComposerSeed {
         let application = AXUIElementCreateApplication(processID)
+        let reportedFocus = try? focusedElement(processID: processID)
+        let focusRoot = reportedFocus ?? application
+        let finder = AXComposerElementFinder()
+        let focused = finder.findComposer(in: focusRoot)
+            ?? (reportedFocus == nil ? nil : finder.findComposer(in: application))
+        guard let focused else {
+            throw CodexInputBridgeError.noFocusedComposer
+        }
+        CodexAccessibilityDiagnostics.focusedElement(focused, processID: processID)
+
+        if let editable = try? boolAttribute(kAXIsEditableAttribute, from: focused), !editable {
+            throw CodexInputBridgeError.focusedElementNotEditable
+        }
+
+        let valueRaw = try Self.copyAttribute(
+            kAXValueAttribute,
+            from: focused,
+            missing: .focusedElementNotEditable
+        )
+        guard let rawValue = valueRaw as? String else {
+            throw CodexInputBridgeError.focusedElementNotEditable
+        }
+        let placeholder = (try? Self.copyAttribute(
+            kAXPlaceholderValueAttribute,
+            from: focused,
+            missing: .focusedElementNotEditable
+        )) as? String
+        let value = normalizedComposerValue(rawValue, placeholder: placeholder)
+        let selection = try selectionRange(from: focused)
+        guard valid(selection, in: value) else {
+            throw CodexInputBridgeError.invalidSelectionRange
+        }
+        return ComposerSeed(
+            document: AXComposerDocument(
+                element: focused,
+                focusRoot: reportedFocus,
+                allowsApplicationTreeFocus: reportedFocus == nil
+            ),
+            processID: processID,
+            originalValue: value,
+            originalSelection: selection
+        )
+    }
+
+    private func focusedElement(processID: pid_t) throws -> AXUIElement {
+        let systemWide = AXUIElementCreateSystemWide()
+        if let focused = try? focusedElement(
+            from: systemWide,
+            processID: processID
+        ) {
+            return focused
+        }
+
+        let application = AXUIElementCreateApplication(processID)
+        if let focused = try? focusedElement(
+            from: application,
+            processID: processID
+        ) {
+            return focused
+        }
+
+        if let windowRaw = try? Self.copyAttribute(
+            kAXFocusedWindowAttribute,
+            from: application,
+            missing: .noFocusedComposer
+        ), CFGetTypeID(windowRaw) == AXUIElementGetTypeID() {
+            return try focusedElement(
+                from: windowRaw as! AXUIElement,
+                processID: processID
+            )
+        }
+
+        throw CodexInputBridgeError.noFocusedComposer
+    }
+
+    private func focusedElement(
+        from root: AXUIElement,
+        processID: pid_t
+    ) throws -> AXUIElement {
         let focusedRaw = try Self.copyAttribute(
             kAXFocusedUIElementAttribute,
-            from: application,
+            from: root,
             missing: .noFocusedComposer
         )
         guard CFGetTypeID(focusedRaw) == AXUIElementGetTypeID() else {
@@ -61,29 +154,7 @@ extension CodexComposerEditor {
         guard pidStatus == .success, focusedProcessID == processID else {
             throw CodexInputBridgeError.noFocusedComposer
         }
-
-        if let editable = try? boolAttribute(kAXIsEditableAttribute, from: focused), !editable {
-            throw CodexInputBridgeError.focusedElementNotEditable
-        }
-
-        let valueRaw = try Self.copyAttribute(
-            kAXValueAttribute,
-            from: focused,
-            missing: .focusedElementNotEditable
-        )
-        guard let value = valueRaw as? String else {
-            throw CodexInputBridgeError.focusedElementNotEditable
-        }
-        let selection = try selectionRange(from: focused)
-        guard valid(selection, in: value) else {
-            throw CodexInputBridgeError.invalidSelectionRange
-        }
-        return ComposerSeed(
-            element: focused,
-            processID: processID,
-            originalValue: value,
-            originalSelection: selection
-        )
+        return focused
     }
 
     func selectionRange(from element: AXUIElement) throws -> NSRange {
@@ -131,10 +202,11 @@ extension CodexComposerEditor {
             &raw
         )
         guard status == .success else {
-            if status == .cannotComplete || status == .notImplemented {
-                throw missing
-            }
-            throw CodexInputBridgeError.accessibilityFailure(Int32(status.rawValue))
+            CodexAccessibilityDiagnostics.attributeFailure(attribute, status: status)
+            throw CodexAccessibilityErrorMapping.map(
+                status: status,
+                missing: missing
+            )
         }
         guard let raw else { throw missing }
         return raw
@@ -169,49 +241,4 @@ extension CodexComposerEditor {
         (value as NSString).substring(with: range)
     }
 
-}
-
-private final class AXComposerDocument: ComposerDocument {
-    private let element: AXUIElement
-
-    init(element: AXUIElement) {
-        self.element = element
-    }
-
-    func isFocused(in processID: pid_t) throws -> Bool {
-        let application = AXUIElementCreateApplication(processID)
-        let focusedRaw = try CodexComposerEditor.copyAttribute(
-            kAXFocusedUIElementAttribute,
-            from: application,
-            missing: .noFocusedComposer
-        )
-        guard CFGetTypeID(focusedRaw) == AXUIElementGetTypeID() else {
-            return false
-        }
-        return CFEqual(focusedRaw, element)
-    }
-
-    func readValue() throws -> String {
-        let raw = try CodexComposerEditor.copyAttribute(
-            kAXValueAttribute,
-            from: element,
-            missing: .focusedElementNotEditable
-        )
-        guard let value = raw as? String else {
-            throw CodexInputBridgeError.focusedElementNotEditable
-        }
-        return value
-    }
-
-    func writeValue(_ value: String) throws {
-        try CodexComposerEditor.setAttribute(
-            kAXValueAttribute,
-            value: value as CFTypeRef,
-            on: element
-        )
-    }
-
-    func writeSelection(_ range: NSRange) throws {
-        try CodexComposerEditor.setSelection(range, on: element)
-    }
 }

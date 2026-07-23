@@ -16,6 +16,8 @@ public final class AudioCapture: @unchecked Sendable {
         label: "CodexChineseVoice.AudioCapture.failure",
         qos: .userInitiated
     )
+    let onLevel: @Sendable (Double) -> Void
+    let onRecordingChanged: @Sendable (Bool) -> Void
     let engine = AVAudioEngine()
     var converter: PCMConverter?
     var continuation: AsyncThrowingStream<Data, Error>.Continuation?
@@ -26,7 +28,13 @@ public final class AudioCapture: @unchecked Sendable {
     var acceptingCallbacks = false
     var frameAccumulator = AudioFrameAccumulator(frameByteCount: 6_400)
 
-    public init() {}
+    public init(
+        onLevel: @escaping @Sendable (Double) -> Void = { _ in },
+        onRecordingChanged: @escaping @Sendable (Bool) -> Void = { _ in }
+    ) {
+        self.onLevel = onLevel
+        self.onRecordingChanged = onRecordingChanged
+    }
 
     public var isRunning: Bool {
         lock.lock()
@@ -85,6 +93,7 @@ public final class AudioCapture: @unchecked Sendable {
         do {
             try validateMicrophonePermission()
             try beginEngine(for: id)
+            onRecordingChanged(true)
             return stream
         } catch {
             finishSession(id: id, error: error)

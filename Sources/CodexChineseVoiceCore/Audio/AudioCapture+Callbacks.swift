@@ -26,6 +26,7 @@ extension AudioCapture {
             resources.gate.leave()
             return
         }
+        onLevel(AudioLevelMeter.normalizedLevel(pcm16LE: data))
         for frame in appendFrames(data, sessionID: id) {
             resources.continuation.yield(frame)
         }
@@ -71,6 +72,7 @@ extension AudioCapture {
         let converterToFinish: PCMConverter?
         var accumulator: AudioFrameAccumulator
         let gate: AudioCaptureCallbackGate?
+        let wasActive: Bool
 
         lifecycleLock.lock()
         lock.lock()
@@ -79,6 +81,7 @@ extension AudioCapture {
             lifecycleLock.unlock()
             return
         }
+        wasActive = active
         cleanupPlan = AudioCaptureCleanupPlan(
             active: active,
             tapInstalled: tapInstalled,
@@ -130,6 +133,10 @@ extension AudioCapture {
             continuation?.finish(throwing: terminalError)
         } else {
             continuation?.finish()
+        }
+        if wasActive {
+            onLevel(0)
+            onRecordingChanged(false)
         }
         lifecycleLock.unlock()
     }

@@ -1,11 +1,7 @@
-import AppKit
 import Foundation
 
-/// Compatibility name for the coordinator's platform-neutral event type.
-public typealias CodexHotkeyEvent = VoiceInputHotkeyEvent
-
 /// Errors shared by the event and Accessibility bridges.
-public enum CodexInputBridgeError: Error, Equatable, Sendable {
+public enum CodexInputBridgeError: Error, LocalizedError, Equatable, Sendable {
     case accessibilityPermissionDenied
     case eventTapUnavailable
     case eventTapSetupFailed
@@ -16,30 +12,29 @@ public enum CodexInputBridgeError: Error, Equatable, Sendable {
     case invalidSelectionRange
     case textChangedExternally
     case noActiveComposition
-}
 
-public typealias CodexHotkeyError = CodexInputBridgeError
-public typealias CodexComposerError = CodexInputBridgeError
-
-/// Convenience owner for applications that want one object for both pieces
-/// of the bridge. It deliberately exposes no submit/send operation.
-public final class CodexInputBridge: @unchecked Sendable {
-    public let hotkeyMonitor: CodexHotkeyMonitor
-    public let composerEditor: CodexComposerEditor
-
-    public init(
-        frontmostBundleIdentifier: @escaping () -> String? = {
-            NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    public var errorDescription: String? {
+        switch self {
+        case .accessibilityPermissionDenied:
+            "需要辅助功能权限"
+        case .eventTapUnavailable:
+            "无法创建全局快捷键监听器"
+        case .eventTapSetupFailed:
+            "无法启动全局快捷键监听器"
+        case .codexNotFrontmost:
+            "请先将 ChatGPT 置于前台"
+        case .noFocusedComposer:
+            "请先在 ChatGPT 中点击消息输入框"
+        case .focusedElementNotEditable:
+            "当前焦点不是可编辑的 ChatGPT 输入框"
+        case let .accessibilityFailure(status):
+            "读取 ChatGPT 输入框失败（辅助功能错误 \(status)）"
+        case .invalidSelectionRange:
+            "无法读取 ChatGPT 输入框的光标位置"
+        case .textChangedExternally:
+            "ChatGPT 输入框内容已发生变化，请重新开始录音"
+        case .noActiveComposition:
+            "当前没有可编辑的语音会话"
         }
-    ) {
-        hotkeyMonitor = CodexHotkeyMonitor(
-            frontmostBundleIdentifier: frontmostBundleIdentifier
-        )
-        composerEditor = CodexComposerEditor(
-            frontmostBundleIdentifier: frontmostBundleIdentifier
-        )
     }
-
-    public func start() throws { try hotkeyMonitor.start() }
-    public func stop() { hotkeyMonitor.stop(); composerEditor.cancelIfActive() }
 }

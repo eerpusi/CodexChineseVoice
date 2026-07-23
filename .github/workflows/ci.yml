@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Swift tests
+        run: swift test
+      - name: Build local universal app
+        run: Scripts/build-app.sh --unsigned
+      - name: Verify release artifact
+        run: Tests/ReleaseArtifactTests.sh
+      - name: Test release tooling
+        run: |
+          Tests/NotarizationToolingTests.sh
+          Tests/PublishReleaseToolingTests.sh
+          VERSION=0.1.0 \
+          GITHUB_REPOSITORY=example/CodexChineseVoice \
+          HOMEBREW_TAP_REPOSITORY=example/homebrew-tap \
+          Scripts/release.sh --check-only

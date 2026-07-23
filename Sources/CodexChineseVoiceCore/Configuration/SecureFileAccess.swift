@@ -79,6 +79,26 @@ enum SecureFileAccess {
         }
         committed = true
     }
+
+    static func withExclusiveLock<Result>(
+        at url: URL,
+        operation: () throws -> Result
+    ) throws -> Result {
+        let path = try SecurePath(url: url)
+        let parentFD = try SecureFileAccessIO.openParent(
+            directoryComponents: path.directoryComponents,
+            create: true
+        )
+        defer { close(parentFD) }
+        let lockFD = try SecureFileAccessIO.openLockFile(
+            path.fileName,
+            relativeTo: parentFD
+        )
+        defer { close(lockFD) }
+        try SecureFileAccessIO.lockExclusive(lockFD)
+        defer { SecureFileAccessIO.unlock(lockFD) }
+        return try operation()
+    }
 }
 
 private extension SecureFileAccess {

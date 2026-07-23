@@ -2,6 +2,12 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
+import OSLog
+
+private let hotkeyLogger = Logger(
+    subsystem: "com.lianenguang.CodexChineseVoice",
+    category: "Hotkey"
+)
 
 /// A session event tap for Command+R. Only the matching key events are hidden
 /// from the frontmost Codex application; every other event is returned intact.
@@ -9,10 +15,9 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
     public static let codexBundleIdentifier = "com.openai.codex"
     public static let commandRKeyCode: CGKeyCode = 15
 
-    public let events: AsyncStream<CodexHotkeyEvent>
-    public var eventStream: AsyncStream<CodexHotkeyEvent> { events }
+    public let events: AsyncStream<VoiceInputHotkeyEvent>
 
-    private let continuation: AsyncStream<CodexHotkeyEvent>.Continuation
+    private let continuation: AsyncStream<VoiceInputHotkeyEvent>.Continuation
     private let frontmostBundleIdentifier: () -> String?
     private let lock = NSLock()
     private var eventTap: CFMachPort?
@@ -27,7 +32,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
             NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         }
     ) {
-        let stream = AsyncStream.makeStream(of: CodexHotkeyEvent.self)
+        let stream = AsyncStream.makeStream(of: VoiceInputHotkeyEvent.self)
         events = stream.stream
         continuation = stream.continuation
         self.frontmostBundleIdentifier = frontmostBundleIdentifier
@@ -49,6 +54,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
         lock.unlock()
 
         guard AXIsProcessTrusted() else {
+            hotkeyLogger.error("event tap start blocked by accessibility permission")
             throw CodexInputBridgeError.accessibilityPermissionDenied
         }
 
@@ -62,6 +68,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
             callback: codexEventTapCallback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            hotkeyLogger.error("event tap creation failed")
             throw CodexInputBridgeError.eventTapUnavailable
         }
 
@@ -71,6 +78,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
             0
         ) else {
             CFMachPortInvalidate(tap)
+            hotkeyLogger.error("event tap run loop setup failed")
             throw CodexInputBridgeError.eventTapSetupFailed
         }
 
@@ -94,8 +102,10 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
 
         if ready.wait(timeout: .now() + 1) == .timedOut {
             stop()
+            hotkeyLogger.error("event tap thread did not become ready")
             throw CodexInputBridgeError.eventTapSetupFailed
         }
+        hotkeyLogger.info("event tap started")
     }
 
     /// Removes the tap and finishes the event stream. A monitor is intended
@@ -124,28 +134,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
             CFMachPortInvalidate(tap)
         }
         continuation.finish()
-    }
-
-    /// Pure matching helper kept public so callers can make the same gate
-    /// decision before starting a recording transaction.
-    public static func matchesCommandR(
-        bundleIdentifier: String?,
-        keyCode: CGKeyCode,
-        flags: CGEventFlags,
-        isAutoRepeat: Bool = false
-    ) -> Bool {
-        guard bundleIdentifier == codexBundleIdentifier,
-              keyCode == commandRKeyCode,
-              !isAutoRepeat,
-              flags.contains(.maskCommand) else {
-            return false
-        }
-
-        let disallowed = CGEventFlags.maskShift.rawValue
-            | CGEventFlags.maskAlternate.rawValue
-            | CGEventFlags.maskControl.rawValue
-            | CGEventFlags.maskSecondaryFn.rawValue
-        return flags.rawValue & disallowed == 0
+        hotkeyLogger.info("event tap stopped")
     }
 
     private func runEventLoop(ready: DispatchSemaphore) {
@@ -207,6 +196,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
             guard shouldBegin else {
                 return nil
             }
+            hotkeyLogger.info("Command-R began")
             continuation.yield(.began)
             return nil
         }
@@ -224,6 +214,7 @@ public final class CodexHotkeyMonitor: @unchecked Sendable {
         guard shouldEnd else {
             return Unmanaged.passUnretained(event)
         }
+        hotkeyLogger.info("Command-R ended")
         continuation.yield(.ended)
         return nil
     }

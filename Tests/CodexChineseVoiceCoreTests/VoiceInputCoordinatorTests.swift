@@ -194,6 +194,30 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         hotkey.finish()
         await runTask.value
     }
+
+    func testStopEndsHotkeyLoopAndCancelsActiveSession() async throws {
+        let hotkey = CoordinatorHotkeySource()
+        let audio = CoordinatorAudioSource()
+        let provider = CoordinatorProvider()
+        let composer = CoordinatorComposer()
+        let coordinator = VoiceInputCoordinator(
+            hotkey: hotkey,
+            audio: audio,
+            provider: provider,
+            composer: composer
+        )
+        let runTask = Task { await coordinator.run() }
+        try await waitUntil { hotkey.startCount == 1 }
+        hotkey.send(.began)
+        try await waitUntil { provider.sessionCount == 1 }
+
+        coordinator.stop()
+        await runTask.value
+
+        XCTAssertEqual(hotkey.stopCount, 1)
+        XCTAssertEqual(audio.stopCount, 1)
+        XCTAssertEqual(composer.cancelCount, 1)
+    }
 }
 
 @MainActor
@@ -262,6 +286,7 @@ private final class CoordinatorHotkeySource: VoiceInputHotkeySource, @unchecked 
     private let lock = NSLock()
     private var starts = 0
     private var stops = 0
+    private var isStopped = false
 
     init() {
         let pair = AsyncStream.makeStream(of: VoiceInputHotkeyEvent.self)
@@ -277,7 +302,13 @@ private final class CoordinatorHotkeySource: VoiceInputHotkeySource, @unchecked 
     }
 
     func stop() {
-        lock.withLock { stops += 1 }
+        let shouldFinish = lock.withLock {
+            guard !isStopped else { return false }
+            isStopped = true
+            stops += 1
+            return true
+        }
+        if shouldFinish { continuation.finish() }
     }
 
     func send(_ event: VoiceInputHotkeyEvent) {

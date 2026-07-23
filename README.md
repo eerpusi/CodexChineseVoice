@@ -1,6 +1,6 @@
 # CodexChineseVoice
 
-An independent, open-source macOS command-line utility for Chinese voice input in Codex.
+An independent, open-source native macOS menu bar app for Chinese voice input in Codex.
 
 ## Product Goal
 
@@ -17,12 +17,22 @@ Provider credentials remain local and are never bundled with the executable.
 
 ## Install and run
 
-This is a native SwiftPM executable, not an Electron or WebView application.
+This is a native SwiftPM macOS app, not an Electron or WebView application.
+
+After the first public release, install both the menu bar app and its optional CLI with:
 
 ```bash
-swift build -c release
-swift run codex-chinese-voice
+brew install --cask LIANENGUANG/tap/codex-chinese-voice
 ```
+
+Until that release exists, build and launch the local app bundle with:
+
+```bash
+./script/build_and_run.sh
+```
+
+The release app is distributed as a signed and notarized `CodexChineseVoice.app` archive.
+Open the app once, then use its menu bar item to configure the provider key and permissions.
 
 The provider key is read from `ARK_PLAN_API_KEY` first. A local fallback file is supported at:
 
@@ -48,11 +58,14 @@ send an automatic message.
 
 ## Current status
 
-The repository contains a work-in-progress prototype for Codex-only `Command+R` gating,
-microphone conversion to 16 kHz mono 16-bit PCM, Volcengine WebSocket streaming, partial/final
-composer replacement, and configuration loading. Offline protocol and configuration tests pass;
-provider, audio, composer, and coordinator coverage is still incomplete.
+The core voice path and native menu bar app are implemented. Offline coverage includes hotkey
+gating, audio framing, Volcengine protocol/provider behavior, composer replacement, permissions,
+cancellation, and app presentation preferences. Local universal unsigned app bundles can be built
+with `Scripts/build-app.sh --unsigned`.
 
-Real-provider calls and end-to-end interaction with a real Codex input field have not yet been
-verified. Do not treat this repository state as a production distribution until those checks and
-packaging/signing work are completed.
+Real-provider calls, signed/notarized distribution, and end-to-end interaction with a real Codex
+input field remain release gates. Do not treat an unsigned local bundle as a production release.
+
+Maintainers can run the complete signed, notarized, GitHub Release, and Homebrew Tap pipeline with
+`Scripts/release.sh --publish` after configuring the prerequisites in
+[`docs/release.md`](docs/release.md).

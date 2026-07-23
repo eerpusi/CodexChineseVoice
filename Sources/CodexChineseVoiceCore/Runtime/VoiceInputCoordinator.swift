@@ -1,4 +1,10 @@
 import Foundation
+import OSLog
+
+private let voiceInputLogger = Logger(
+    subsystem: "com.lianenguang.CodexChineseVoice",
+    category: "VoiceInput"
+)
 
 public enum VoiceInputHotkeyEvent: Sendable {
     case began
@@ -54,22 +60,35 @@ public final class VoiceInputCoordinator {
     }
 
     public func run() async {
+        voiceInputLogger.info("voice input coordinator starting")
         do {
             try hotkey.start()
         } catch {
+            voiceInputLogger.error("hotkey monitor start failed")
             report("无法监听 Command+R：\(error.localizedDescription)")
             return
         }
-        defer { hotkey.stop(); cancelSession() }
+        defer {
+            hotkey.stop()
+            cancelSession()
+            voiceInputLogger.info("voice input coordinator stopped")
+        }
 
         for await event in hotkey.events {
             switch event {
             case .began:
+                voiceInputLogger.info("recording begin event received")
                 beginSession()
             case .ended:
+                voiceInputLogger.info("recording end event received")
                 endSession()
             }
         }
+    }
+
+    public func stop() {
+        cancelSession()
+        hotkey.stop()
     }
 
     private func beginSession() {
@@ -99,6 +118,9 @@ public final class VoiceInputCoordinator {
                 }
             }
         } catch {
+            voiceInputLogger.error(
+                "recording session start failed: \(error.localizedDescription, privacy: .public)"
+            )
             report("无法开始录音：\(error.localizedDescription)")
             audio.stop()
             composer.cancel()
@@ -109,6 +131,7 @@ public final class VoiceInputCoordinator {
         guard sessionTask != nil else { return }
         released = true
         audio.stop()
+        voiceInputLogger.info("audio capture stopped")
         if providerDidFinish {
             finishReleasedSession()
         }
@@ -125,6 +148,9 @@ public final class VoiceInputCoordinator {
                 try composer.replacePartial(event.text)
             }
         } catch {
+            voiceInputLogger.error(
+                "composer update failed: \(error.localizedDescription, privacy: .public)"
+            )
             report("无法更新 Codex 输入框：\(error.localizedDescription)")
             cancelSession()
         }
@@ -142,6 +168,9 @@ public final class VoiceInputCoordinator {
             do {
                 try composer.finalize(currentText)
             } catch {
+                voiceInputLogger.error(
+                    "composer finalization failed: \(error.localizedDescription, privacy: .public)"
+                )
                 report("无法完成 Codex 输入：\(error.localizedDescription)")
                 composer.cancel()
             }
@@ -160,6 +189,9 @@ public final class VoiceInputCoordinator {
 
     private func providerFailed(_ error: Error, sessionID: UInt64) {
         guard activeSessionID == sessionID else { return }
+        voiceInputLogger.error(
+            "speech recognition failed: \(error.localizedDescription, privacy: .public)"
+        )
         report("语音识别失败：\(error.localizedDescription)")
         audio.stop()
         composer.cancel()

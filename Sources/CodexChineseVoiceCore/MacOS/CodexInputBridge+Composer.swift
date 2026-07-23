@@ -104,7 +104,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
 
     /// Replaces the complete partial result owned by this recording session.
     public func replacePartial(_ text: String) throws {
-        try mutate(text: text, finish: false)
+        try mutate(text: text)
     }
 
     /// Replaces the owned partial with the final result. An empty final rolls
@@ -146,11 +146,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
         lock.unlock()
     }
 
-    func cancelIfActive() {
-        cancel()
-    }
-
-    private func mutate(text: String, finish: Bool) throws {
+    private func mutate(text: String) throws {
         lock.lock()
         defer { lock.unlock() }
         guard var active = composition else {
@@ -159,7 +155,7 @@ public final class CodexComposerEditor: @unchecked Sendable {
         do {
             try ensureFrontmost(active)
             try replaceOwnedValue(&active, with: text)
-            if finish { composition = nil } else { composition = active }
+            composition = active
         } catch {
             composition = active
             throw error
