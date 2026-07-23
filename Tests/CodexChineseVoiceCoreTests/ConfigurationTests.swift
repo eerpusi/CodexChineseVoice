@@ -74,17 +74,16 @@ final class ConfigurationTests: XCTestCase {
             at: location.root,
             withIntermediateDirectories: true
         )
-        let content = Data(
-            Array("ark_plan_api_key = \"a".utf8)
-                + [0x5C, 0x62]
-                + Array("b".utf8)
-                + [0x5C, 0x66]
-                + Array("c".utf8)
-                + [0x5C, 0x55]
-                + Array("0001F642".utf8)
-                + [0x5C, 0x5C]
-                + Array("U0001F642\"\n".utf8)
-        )
+        var bytes = Array("ark_plan_api_key = \"a".utf8)
+        bytes.append(contentsOf: [0x5C, 0x62])
+        bytes.append(contentsOf: "b".utf8)
+        bytes.append(contentsOf: [0x5C, 0x66])
+        bytes.append(contentsOf: "c".utf8)
+        bytes.append(contentsOf: [0x5C, 0x55])
+        bytes.append(contentsOf: "0001F642".utf8)
+        bytes.append(contentsOf: [0x5C, 0x5C])
+        bytes.append(contentsOf: "U0001F642\"\n".utf8)
+        let content = Data(bytes)
         try writePrivateFixture(content, to: location.file)
 
         XCTAssertEqual(
