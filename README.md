@@ -22,7 +22,7 @@ This is a native SwiftPM macOS app, not an Electron or WebView application.
 After the first public release, install both the menu bar app and its optional CLI with:
 
 ```bash
-brew install --cask LIANENGUANG/tap/codex-chinese-voice
+brew install --cask eerpusi/tap/codex-chinese-voice
 ```
 
 Until that release exists, build and launch the local app bundle with:
