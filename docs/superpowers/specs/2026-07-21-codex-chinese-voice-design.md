@@ -1,24 +1,30 @@
 # CodexChineseVoice Design
 
 Date: 2026-07-21
-Status: Approved for implementation planning
+Status: Approved for implementation planning; auto-send requirement updated 2026-07-23
 License: MIT
+
+> **Requirement update:** The original no-submit rule is superseded by the
+> [Automatic Transcript Submission Design](2026-07-23-auto-send-transcription-design.md).
+> Auto-send is user-configurable, defaults to enabled, and applies only to a successful non-empty
+> final transcription after `Command+R` is released.
 
 ## 1. Product
 
-CodexChineseVoice is an independent open-source macOS command-line utility for Chinese voice
-input in the Codex desktop app. It has no visible window, menu bar item, Dock icon, or dependency
-on another local project or service.
+CodexChineseVoice is an independent open-source native macOS menu bar utility for Chinese voice
+input in the Codex desktop app. It includes an optional command-line interface and has no
+dependency on another local project or service. Its Settings window manages the provider key,
+permissions, Dock visibility, and the auto-send preference.
 
 The user-facing workflow is intentionally small:
 
 ```sh
-brew install codex-chinese-voice
-codex-chinese-voice start
+brew install --cask eerpusi/tap/codex-chinese-voice
+open -a CodexChineseVoice
 ```
 
-On the first start, the tool asks for the Volcengine API key and guides the user through microphone
-and Accessibility permissions. Later starts use the saved configuration.
+On the first launch, the app guides the user through the Volcengine API key, microphone permission,
+and Accessibility permission. Later launches use the saved configuration.
 
 While Codex (`com.openai.codex`) is frontmost:
 
@@ -26,7 +32,8 @@ While Codex (`com.openai.codex`) is frontmost:
 2. Partial recognition text appears in the focused Codex composer.
 3. Releasing `Command+R` stops recording.
 4. The final transcript replaces only the partial text owned by the current recording session.
-5. The message is never submitted automatically.
+5. If auto-send is enabled, the completed composer is submitted exactly once. If it is disabled,
+   the final text remains in the composer.
 
 In every other app, `Command+R` keeps its normal behavior.
 
@@ -34,12 +41,14 @@ In every other app, `Command+R` keeps its normal behavior.
 
 Version 1 includes:
 
-- A native Swift command-line executable installed with Homebrew.
+- A native Swift menu bar app and bundled command-line executable installed with Homebrew.
+- A Settings window for credentials, permissions, Dock visibility, and auto-send.
 - Background start, stop, status, configuration, and diagnostics commands.
 - Codex-only `Command+R` press and release handling.
 - Microphone capture and conversion to provider-ready PCM.
 - Volcengine Doubao streaming ASR 2.0 through Agent Plan.
 - Partial and final transcript replacement in the focused Codex composer.
+- A user-controlled, default-on setting for submitting successful final transcriptions.
 - Clear first-run permission and configuration guidance.
 - Automated tests and an opt-in real-provider test using synthetic audio.
 - Signed and notarized release archives for macOS 14 or later.
@@ -47,11 +56,9 @@ Version 1 includes:
 
 Version 1 does not include:
 
-- A graphical settings application.
 - Automatic launch at login.
 - Custom shortcuts or provider selection.
 - Audio history, transcript history, analytics, or telemetry.
-- Automatic message submission.
 
 ## 3. Commands And Local Files
 
@@ -183,8 +190,9 @@ editable element belongs to the frontmost Codex process and records the current 
 
 Each recording owns one text range. Every partial result replaces that same range as a complete
 value; partials are never concatenated as deltas. The final result replaces the owned partial range.
-Text outside that range is preserved. The editor never invokes a submit action or synthesizes the
-Return key.
+Text outside that range is preserved. After a successful final write, the editor may synthesize one
+unmodified Return key when auto-send is enabled. It must revalidate the captured Codex process and
+focused composer immediately before submission.
 
 ### Session coordinator
 
@@ -207,7 +215,8 @@ composer transaction, and guarantees cleanup when any component stops or fails.
 4. Each partial event replaces the current session-owned range.
 5. `Command+R` key-up closes audio input and sends the provider's final audio frame.
 6. The final event replaces the partial and ends the session.
-7. Focus remains in the composer and the user decides whether to edit or send the message.
+7. The completed composer is submitted once when auto-send is enabled; otherwise focus remains in
+   the composer so the user can edit or send it manually.
 
 ## 7. Failure And Cancellation
 
@@ -250,6 +259,8 @@ Automated tests cover:
 - Full-result partial replacement without concatenation.
 - Final replacement, empty final, cancellation rollback, selected-text restoration, and preservation
   of unrelated composer text.
+- Default-on preference persistence, disabled behavior, exactly-once final submission, and
+  prevention of submission for partial, empty, failed, cancelled, stale, or unfocused sessions.
 - Missing, unreadable, and permission-invalid configuration.
 - Cleanup after audio, network, provider, focus, and process-stop failures.
 
@@ -260,7 +271,9 @@ synthetic Chinese audio at real-time intervals.
 Before a release is described as usable, a signed build must be manually verified on a supported
 macOS version against the real Codex desktop composer. The check must cover first-run permissions,
 Codex-only shortcut interception, visible partial updates, final replacement, original-text
-preservation, cancellation, and confirmation that no message is automatically submitted.
+preservation, and cancellation. The check must also confirm exactly one send for a successful final
+transcription when auto-send is enabled, retained final text when it is disabled, and no send from
+any ineligible session.
 
 ## 10. Distribution
 

@@ -4,7 +4,9 @@ Date: 2026-07-23
 
 ## Automated
 
-- `swift test`: PASS, 167 tests, 0 failures.
+- `swift test`: PASS, 192 tests, 0 failures.
+- Auto-send preference default, persistence, disabled behavior, exactly-once completion, and
+  ineligible-session safeguards: PASS with deterministic tests.
 - Universal app and bundled CLI (`arm64`, `x86_64`): PASS.
 - Native app bundle build, LaunchServices launch, and process verification on the macOS host: PASS.
 - CLI `--help`, `status`, and `stop` smoke checks without an API key: PASS.
@@ -21,7 +23,9 @@ Date: 2026-07-23
   authorization and a valid `ARK_PLAN_API_KEY`.
 - Real Codex end-to-end test: NOT RUN for the final signed artifact. Must verify Codex-only
   `Command+R`, microphone capture, visible partial replacement, final replacement, preservation of
-  unrelated composer text, cancellation, and no automatic submission.
+  unrelated composer text, and cancellation. With auto-send enabled, each successful non-empty
+  final transcription must send exactly once; with it disabled, final text must remain in the
+  composer. Partial, empty, failed, cancelled, stale, and unfocused sessions must never send.
 - GitHub Release publication: NOT RUN. GitHub CLI authentication and repository remote are missing.
 - Homebrew Tap clean install/upgrade/uninstall: NOT RUN until the GitHub Release exists.
 

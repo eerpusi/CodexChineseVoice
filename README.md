@@ -7,7 +7,8 @@ An independent, open-source native macOS menu bar app for Chinese voice input in
 - Hold `Command+R` while Codex is focused to record speech.
 - Stream audio to a configurable ASR provider and show partial text in the Codex composer.
 - Replace the partial text with the final transcript when the shortcut is released.
-- Never submit the Codex message automatically.
+- Automatically submit a successful final transcript when the user-controlled setting is enabled.
+  The setting defaults to enabled and can be turned off to leave the final text in the composer.
 - Keep provider credentials outside the application bundle and repository.
 
 ## Initial Provider
@@ -32,7 +33,8 @@ Until that release exists, build and launch the local app bundle with:
 ```
 
 The release app is distributed as a signed and notarized `CodexChineseVoice.app` archive.
-Open the app once, then use its menu bar item to configure the provider key and permissions.
+Open the app once, then use its menu bar item to configure the provider key, permissions, and
+whether completed transcriptions are sent automatically.
 
 The provider key is read from `ARK_PLAN_API_KEY` first. A local fallback file is supported at:
 
@@ -54,14 +56,15 @@ terminal session that launches the utility when possible.
 The first run requests Microphone permission and opens the macOS Accessibility authorization
 prompt when needed. Grant access to the terminal or installed executable in **System Settings >
 Privacy & Security**, then run the command again. The utility does not change these settings or
-send an automatic message.
+send partial, empty, failed, cancelled, stale, or unfocused transcriptions. A successful final
+transcription is sent once only when the auto-send setting is enabled.
 
 ## Current status
 
 The core voice path and native menu bar app are implemented. Offline coverage includes hotkey
 gating, audio framing, Volcengine protocol/provider behavior, composer replacement, permissions,
-cancellation, and app presentation preferences. Local universal unsigned app bundles can be built
-with `Scripts/build-app.sh --unsigned`.
+cancellation, configurable final-transcript submission, and app presentation preferences. Local
+universal unsigned app bundles can be built with `Scripts/build-app.sh --unsigned`.
 
 Real-provider calls, signed/notarized distribution, and end-to-end interaction with a real Codex
 input field remain release gates. Do not treat an unsigned local bundle as a production release.

@@ -1,5 +1,11 @@
 # CodexChineseVoice Implementation Plan
 
+> **Historical plan:** The original no-submit requirement in this plan was superseded on
+> 2026-07-23 by the
+> [Automatic Transcript Submission Design](../specs/2026-07-23-auto-send-transcription-design.md).
+> Current behavior is user-configurable auto-send, enabled by default, after a successful final
+> transcription only. The original steps below are preserved as implementation history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a native, Homebrew-installable macOS command that turns hold-to-talk `Command+R` into safe Chinese voice input for the focused Codex composer.

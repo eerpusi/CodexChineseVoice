@@ -1,12 +1,13 @@
 # Automatic Transcript Submission Design
 
 Date: 2026-07-23
+Status: Implemented
 
 ## Goal
 
 Add a user-configurable option that submits the active Codex composer after a successful voice
-transcription. The option is enabled by default. This requirement supersedes the earlier product
-rule that the utility must never send messages automatically.
+transcription. The option is enabled by default. This requirement supersedes the earlier
+no-submit product rule.
 
 ## User Experience
 
@@ -66,7 +67,7 @@ composer transaction, never as an independent global action.
 
 ## Testing
 
-Focused automated coverage will verify:
+Focused automated coverage verifies:
 
 - Auto-send defaults to enabled and both preference values persist.
 - Enabled sessions complete and request one submission.
