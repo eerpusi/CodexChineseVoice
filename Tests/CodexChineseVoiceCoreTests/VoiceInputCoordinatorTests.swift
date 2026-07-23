@@ -108,7 +108,6 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         try await waitUntil { harness.provider.sessionCount == 1 }
         harness.provider.send(TranscriptEvent(text: "完成", isFinal: true), session: 0)
         harness.provider.finish(session: 0)
-        try await waitUntil { harness.composer.partials == ["完成"] }
         try await Task.sleep(for: .milliseconds(20))
         XCTAssertTrue(harness.composer.completions.isEmpty)
 
@@ -118,6 +117,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         let startedAgain = await eventually { harness.provider.sessionCount == 2 }
 
         XCTAssertTrue(startedAgain)
+        XCTAssertTrue(harness.composer.partials.isEmpty)
         XCTAssertEqual(
             harness.composer.completions,
             [CoordinatorCompletion(text: "完成", submit: true)]
@@ -126,7 +126,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         await harness.stop()
     }
 
-    func testPartialThenReleaseThenFinalCompletesComposer() async throws {
+    func testFinalCompletesWithoutRedundantPartialWrite() async throws {
         let harness = CoordinatorHarness()
         try await harness.start()
 
@@ -141,7 +141,7 @@ final class VoiceInputCoordinatorTests: XCTestCase {
         harness.provider.finish(session: 0)
         try await waitUntil { harness.composer.completions.count == 1 }
 
-        XCTAssertEqual(harness.composer.partials, ["你", "你好"])
+        XCTAssertEqual(harness.composer.partials, ["你"])
         XCTAssertEqual(
             harness.composer.completions,
             [CoordinatorCompletion(text: "你好", submit: true)]

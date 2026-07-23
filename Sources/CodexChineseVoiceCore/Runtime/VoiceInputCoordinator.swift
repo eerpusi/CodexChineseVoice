@@ -142,6 +142,7 @@ public final class VoiceInputCoordinator {
         guard activeSessionID == sessionID else { return }
         if event.isFinal {
             finalText = event.text
+            return
         }
         do {
             try composer.replacePartial(event.text)
