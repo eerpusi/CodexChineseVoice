@@ -3,6 +3,13 @@ import XCTest
 @testable import CodexChineseVoiceCore
 
 extension VolcengineProviderTests {
+    func testConnectionClosedHasActionableLocalizedDescription() {
+        XCTAssertEqual(
+            VolcengineProviderError.connectionClosed.localizedDescription,
+            "语音服务连接在最终结果返回前已关闭，请重试。"
+        )
+    }
+
     func testEmptyAPIKeyFailsBeforeOpeningTransport() async throws {
         let connection = FakeVolcengineConnection()
         let transport = FakeVolcengineTransport(connection: connection)

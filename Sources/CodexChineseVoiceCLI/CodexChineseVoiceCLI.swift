@@ -27,6 +27,9 @@ struct CodexChineseVoiceCLI {
         } catch PermissionPreflightError.accessibilityRequired {
             writeError("需要辅助功能权限才能监听 Command+R 并写入 Codex。请在系统设置中授权。")
             exit(4)
+        } catch PermissionPreflightError.inputMonitoringRequired {
+            writeError("需要输入监控权限才能监听 Command+R。请在系统设置 > 隐私与安全性 > 输入监控中授权。")
+            exit(5)
         } catch {
             writeError("操作失败：\(error.localizedDescription)")
             exit(1)
@@ -105,11 +108,13 @@ struct CodexChineseVoiceCLI {
         let permissions = SystemPermissionProvider()
         let microphone = permissions.microphonePermission == .granted
         let accessibility = permissions.isAccessibilityTrusted(prompt: false)
+        let inputMonitoring = permissions.isInputMonitoringTrusted(prompt: false)
         let process = try makeRouter().run(.status)
 
         print("API Key: \(hasConfiguration ? "已配置" : "未配置")")
         print("麦克风权限: \(microphone ? "已授权" : "未授权")")
         print("辅助功能权限: \(accessibility ? "已授权" : "未授权")")
+        print("输入监控权限: \(inputMonitoring ? "已授权" : "未授权")")
         if case let .message(status) = process {
             print(status)
         }

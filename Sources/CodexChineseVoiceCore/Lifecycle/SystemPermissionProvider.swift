@@ -1,7 +1,13 @@
 import ApplicationServices
 @preconcurrency import AVFAudio
+import CoreGraphics
+import Foundation
 
 public final class SystemPermissionProvider: PermissionProviding, @unchecked Sendable {
+    public static let inputMonitoringSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+    )!
+
     public init() {}
 
     public var microphonePermission: MicrophonePermission {
@@ -18,6 +24,13 @@ public final class SystemPermissionProvider: PermissionProviding, @unchecked Sen
             "AXTrustedCheckOptionPrompt": true
         ] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
+    }
+
+    public func isInputMonitoringTrusted(prompt: Bool) -> Bool {
+        if prompt {
+            return CGRequestListenEventAccess()
+        }
+        return CGPreflightListenEventAccess()
     }
 
     static func map(_ permission: AVAudioApplication.recordPermission) -> MicrophonePermission {

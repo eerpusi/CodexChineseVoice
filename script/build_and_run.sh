@@ -22,6 +22,7 @@ cp "${BUILD_BINARY}" "${APP_BINARY}"
 cp "${ROOT_DIR}/Packaging/AppIcon.icns" "${APP_RESOURCES}/AppIcon.icns"
 cp "${ROOT_DIR}/Packaging/Info.plist" "${APP_CONTENTS}/Info.plist"
 chmod +x "${APP_BINARY}"
+bash "${ROOT_DIR}/Scripts/sign-local-app.sh" "${APP_BUNDLE}"
 
 open_app() {
     /usr/bin/open -n "${APP_BUNDLE}"

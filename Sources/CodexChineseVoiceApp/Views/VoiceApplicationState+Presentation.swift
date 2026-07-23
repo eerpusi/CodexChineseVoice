@@ -8,6 +8,7 @@ extension VoiceApplicationState {
         case .needsConfiguration: "需要配置"
         case .needsMicrophonePermission: "需要麦克风权限"
         case .needsAccessibilityPermission: "需要辅助功能权限"
+        case .needsInputMonitoringPermission: "需要输入监控权限"
         case .failed: "运行失败"
         }
     }
@@ -19,6 +20,7 @@ extension VoiceApplicationState {
         case .needsConfiguration: "key"
         case .needsMicrophonePermission: "mic.slash"
         case .needsAccessibilityPermission: "hand.raised"
+        case .needsInputMonitoringPermission: "keyboard"
         case .failed: "exclamationmark.triangle"
         }
     }

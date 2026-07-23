@@ -10,6 +10,7 @@ public enum VoiceApplicationState: Equatable, Sendable {
     case needsConfiguration
     case needsMicrophonePermission
     case needsAccessibilityPermission
+    case needsInputMonitoringPermission
     case failed(VoiceApplicationFailure)
 
     public var failureMessage: String? {
@@ -46,20 +47,30 @@ public enum VoiceApplicationState: Equatable, Sendable {
             .needsMicrophonePermission
         case .accessibilityRequired:
             .needsAccessibilityPermission
+        case .inputMonitoringRequired:
+            .needsInputMonitoringPermission
         }
     }
 
     public func shouldRetry(
         microphonePermission: MicrophonePermission,
-        accessibilityTrusted: Bool
+        accessibilityTrusted: Bool,
+        inputMonitoringTrusted: Bool
     ) -> Bool {
         switch self {
         case .needsMicrophonePermission:
             microphonePermission == .granted
         case .needsAccessibilityPermission:
             accessibilityTrusted
+        case .needsInputMonitoringPermission:
+            inputMonitoringTrusted
         default:
             false
         }
+    }
+
+    public func recoveringForRecordingStart() -> VoiceApplicationState {
+        guard case .failed(.runtime) = self else { return self }
+        return .ready
     }
 }

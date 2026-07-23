@@ -39,7 +39,8 @@ final class VoiceApplicationModel {
         let permissions = SystemPermissionProvider()
         guard state.shouldRetry(
             microphonePermission: permissions.microphonePermission,
-            accessibilityTrusted: permissions.isAccessibilityTrusted(prompt: false)
+            accessibilityTrusted: permissions.isAccessibilityTrusted(prompt: false),
+            inputMonitoringTrusted: permissions.isInputMonitoringTrusted(prompt: false)
         ) else {
             return
         }
@@ -74,9 +75,13 @@ final class VoiceApplicationModel {
                 },
                 onRecordingChanged: { [weak self] isRecording in
                     Task { @MainActor [weak self] in
-                        self?.isRecording = isRecording
+                        guard let self else { return }
+                        self.isRecording = isRecording
+                        if isRecording {
+                            self.state = self.state.recoveringForRecordingStart()
+                        }
                         if !isRecording {
-                            self?.inputLevel = 0
+                            self.inputLevel = 0
                         }
                     }
                 }

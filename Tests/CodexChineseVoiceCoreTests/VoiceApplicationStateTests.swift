@@ -26,37 +26,60 @@ final class VoiceApplicationStateTests: XCTestCase {
             VoiceApplicationState.from(.accessibilityRequired),
             .needsAccessibilityPermission
         )
+        XCTAssertEqual(
+            VoiceApplicationState.from(.inputMonitoringRequired),
+            .needsInputMonitoringPermission
+        )
     }
 
     func testPermissionStateRetriesOnlyAfterRequiredPermissionIsGranted() {
         XCTAssertTrue(
             VoiceApplicationState.needsMicrophonePermission.shouldRetry(
                 microphonePermission: .granted,
-                accessibilityTrusted: false
+                accessibilityTrusted: false,
+                inputMonitoringTrusted: false
             )
         )
         XCTAssertFalse(
             VoiceApplicationState.needsMicrophonePermission.shouldRetry(
                 microphonePermission: .denied,
-                accessibilityTrusted: true
+                accessibilityTrusted: true,
+                inputMonitoringTrusted: true
             )
         )
         XCTAssertTrue(
             VoiceApplicationState.needsAccessibilityPermission.shouldRetry(
                 microphonePermission: .granted,
-                accessibilityTrusted: true
+                accessibilityTrusted: true,
+                inputMonitoringTrusted: false
             )
         )
         XCTAssertFalse(
             VoiceApplicationState.needsAccessibilityPermission.shouldRetry(
                 microphonePermission: .granted,
-                accessibilityTrusted: false
+                accessibilityTrusted: false,
+                inputMonitoringTrusted: true
+            )
+        )
+        XCTAssertTrue(
+            VoiceApplicationState.needsInputMonitoringPermission.shouldRetry(
+                microphonePermission: .granted,
+                accessibilityTrusted: true,
+                inputMonitoringTrusted: true
+            )
+        )
+        XCTAssertFalse(
+            VoiceApplicationState.needsInputMonitoringPermission.shouldRetry(
+                microphonePermission: .granted,
+                accessibilityTrusted: true,
+                inputMonitoringTrusted: false
             )
         )
         XCTAssertFalse(
             VoiceApplicationState.ready.shouldRetry(
                 microphonePermission: .granted,
-                accessibilityTrusted: true
+                accessibilityTrusted: true,
+                inputMonitoringTrusted: true
             )
         )
     }
@@ -68,5 +91,23 @@ final class VoiceApplicationStateTests: XCTestCase {
             "请点击输入框"
         )
         XCTAssertNil(VoiceApplicationState.ready.failureMessage)
+    }
+
+    func testRecordingStartRecoversOnlyRuntimeFailure() {
+        XCTAssertEqual(
+            VoiceApplicationState.failed(.runtime("连接已关闭"))
+                .recoveringForRecordingStart(),
+            .ready
+        )
+        XCTAssertEqual(
+            VoiceApplicationState.failed(.configurationInvalid)
+                .recoveringForRecordingStart(),
+            .failed(.configurationInvalid)
+        )
+        XCTAssertEqual(
+            VoiceApplicationState.needsAccessibilityPermission
+                .recoveringForRecordingStart(),
+            .needsAccessibilityPermission
+        )
     }
 }

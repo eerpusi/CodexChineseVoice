@@ -7,12 +7,14 @@ public enum MicrophonePermission: Equatable, Sendable {
 public enum PermissionPreflightError: Error, Equatable, Sendable {
     case microphoneDenied
     case accessibilityRequired
+    case inputMonitoringRequired
 }
 
 public protocol PermissionProviding: Sendable {
     var microphonePermission: MicrophonePermission { get }
     func requestMicrophonePermission() async -> Bool
     func isAccessibilityTrusted(prompt: Bool) -> Bool
+    func isInputMonitoringTrusted(prompt: Bool) -> Bool
 }
 
 public struct PermissionPreflight<Provider: PermissionProviding>: Sendable {
@@ -36,6 +38,11 @@ public struct PermissionPreflight<Provider: PermissionProviding>: Sendable {
         if !provider.isAccessibilityTrusted(prompt: false) {
             guard provider.isAccessibilityTrusted(prompt: true) else {
                 throw PermissionPreflightError.accessibilityRequired
+            }
+        }
+        if !provider.isInputMonitoringTrusted(prompt: false) {
+            guard provider.isInputMonitoringTrusted(prompt: true) else {
+                throw PermissionPreflightError.inputMonitoringRequired
             }
         }
     }

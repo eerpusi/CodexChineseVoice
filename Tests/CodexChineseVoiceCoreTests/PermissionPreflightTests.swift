@@ -61,6 +61,26 @@ final class PermissionPreflightTests: XCTestCase {
         XCTAssertEqual(provider.accessibilityPromptValues, [false, true])
     }
 
+    func testMissingInputMonitoringPermissionIsReportedAfterAccessibility() async {
+        let provider = FakePermissionProvider(
+            microphone: .granted,
+            requestMicrophoneResult: true,
+            accessibilityChecks: [true],
+            inputMonitoringChecks: [false, false]
+        )
+
+        do {
+            try await PermissionPreflight(provider: provider).ensureReady()
+            XCTFail("Expected input monitoring permission to be required")
+        } catch {
+            XCTAssertEqual(
+                error as? PermissionPreflightError,
+                .inputMonitoringRequired
+            )
+            XCTAssertEqual(provider.inputMonitoringPromptValues, [false, true])
+        }
+    }
+
     func testDeniedMicrophoneStopsBeforeAccessibilityCheck() async {
         let provider = FakePermissionProvider(
             microphone: .denied,
@@ -109,6 +129,13 @@ final class PermissionPreflightTests: XCTestCase {
             .undetermined
         )
     }
+
+    func testInputMonitoringSettingsURLTargetsPrivacyInputMonitoring() {
+        XCTAssertEqual(
+            SystemPermissionProvider.inputMonitoringSettingsURL.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+        )
+    }
 }
 
 private final class FakePermissionProvider: PermissionProviding, @unchecked Sendable {
@@ -116,17 +143,21 @@ private final class FakePermissionProvider: PermissionProviding, @unchecked Send
     private var microphone: MicrophonePermission
     private let requestMicrophoneResult: Bool
     private var accessibilityChecks: [Bool]
+    private var inputMonitoringChecks: [Bool]
     private(set) var microphoneRequestCount = 0
     private(set) var accessibilityPromptValues: [Bool] = []
+    private(set) var inputMonitoringPromptValues: [Bool] = []
 
     init(
         microphone: MicrophonePermission,
         requestMicrophoneResult: Bool,
-        accessibilityChecks: [Bool]
+        accessibilityChecks: [Bool],
+        inputMonitoringChecks: [Bool] = [true]
     ) {
         self.microphone = microphone
         self.requestMicrophoneResult = requestMicrophoneResult
         self.accessibilityChecks = accessibilityChecks
+        self.inputMonitoringChecks = inputMonitoringChecks
     }
 
     var microphonePermission: MicrophonePermission {
@@ -147,6 +178,13 @@ private final class FakePermissionProvider: PermissionProviding, @unchecked Send
         lock.withLock {
             accessibilityPromptValues.append(prompt)
             return accessibilityChecks.isEmpty ? false : accessibilityChecks.removeFirst()
+        }
+    }
+
+    func isInputMonitoringTrusted(prompt: Bool) -> Bool {
+        lock.withLock {
+            inputMonitoringPromptValues.append(prompt)
+            return inputMonitoringChecks.isEmpty ? false : inputMonitoringChecks.removeFirst()
         }
     }
 }

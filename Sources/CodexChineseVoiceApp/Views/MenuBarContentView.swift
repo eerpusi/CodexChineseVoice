@@ -1,4 +1,5 @@
 import AppKit
+import CodexChineseVoiceCore
 import SwiftUI
 
 struct MenuBarContentView: View {
@@ -16,6 +17,21 @@ struct MenuBarContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if model.state == .needsInputMonitoringPermission {
+            Text("要监听 Codex 中的 Command+R，需要允许本应用访问全局键盘事件。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                NSWorkspace.shared.open(
+                    SystemPermissionProvider.inputMonitoringSettingsURL
+                )
+            } label: {
+                Label("打开输入监控设置", systemImage: "arrow.up.forward.app")
+            }
         }
 
         Divider()

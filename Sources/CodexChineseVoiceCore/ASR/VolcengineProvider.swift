@@ -1,10 +1,21 @@
 import Foundation
 
 /// Errors raised by the WebSocket adapter before or outside the wire protocol.
-public enum VolcengineProviderError: Error, Equatable, Sendable {
+public enum VolcengineProviderError: LocalizedError, Equatable, Sendable {
     case missingAPIKey
     case unexpectedTextMessage
     case connectionClosed
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingAPIKey:
+            "未配置火山引擎 API Key。"
+        case .unexpectedTextMessage:
+            "语音服务返回了不支持的消息格式。"
+        case .connectionClosed:
+            "语音服务连接在最终结果返回前已关闭，请重试。"
+        }
+    }
 }
 
 /// Streams PCM chunks to the Volcengine Agent Plan endpoint.
