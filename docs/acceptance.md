@@ -4,7 +4,7 @@ Date: 2026-07-24
 
 ## Automated
 
-- `swift test`: PASS, 138 tests, 0 failures after removing CLI-only lifecycle coverage.
+- `swift test`: PASS, 144 tests, 0 failures after removing CLI-only lifecycle coverage.
 - Auto-send preference default, persistence, disabled behavior, exactly-once completion, and
   ineligible-session safeguards: PASS with deterministic tests.
 - App-only SwiftPM manifest with no CLI product or target: PASS.

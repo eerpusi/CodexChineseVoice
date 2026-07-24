@@ -28,6 +28,21 @@ open_app() {
     /usr/bin/open -n "${APP_BUNDLE}"
 }
 
+verify_fresh_bundle() {
+    local process_id
+    local running_binary
+
+    for process_id in $(pgrep -x "${APP_NAME}"); do
+        running_binary="$(/bin/ps -p "${process_id}" -o comm=)"
+        if [[ "${running_binary}" == "${APP_BINARY}" ]]; then
+            return 0
+        fi
+    done
+
+    echo "${APP_NAME} is not running from ${APP_BINARY}" >&2
+    return 1
+}
+
 case "${MODE}" in
     run)
         open_app
@@ -46,7 +61,7 @@ case "${MODE}" in
     --verify|verify)
         open_app
         sleep 1
-        pgrep -x "${APP_NAME}" >/dev/null
+        verify_fresh_bundle
         ;;
     *)
         echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

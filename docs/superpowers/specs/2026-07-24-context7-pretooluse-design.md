@@ -64,3 +64,12 @@ and [hook schema](https://github.com/openai/codex/blob/main/codex/codex-rs/hooks
 Apple guidance treats the bundle identifier as the app identity while requiring each distributable
 build to be signed and macOS software to be notarized; see [Preparing Your App for
 Distribution](https://developer.apple.com/documentation/xcode/preparing-your-app-for-distribution).
+
+## 2026-07-24 Local Run Workflow Evidence
+
+Context7's current Swift Package Manager documentation confirms that `swift build --show-bin-path`
+prints the build-products directory and may be used with the same relevant build arguments. The
+local run script therefore builds the named product first, obtains its binary from that directory,
+and stages exactly one app at `dist/CodexChineseVoice.app`. Its `--verify` mode also compares the
+running process executable path to the binary inside that fresh bundle, rather than accepting any
+same-named process.

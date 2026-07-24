@@ -16,6 +16,8 @@ jobs:
         run: Tests/AppOnlyPackageTests.sh
       - name: Verify Context7 PreToolUse hook
         run: Tests/Context7PreToolUseHookTests.sh
+      - name: Verify local development run workflow
+        run: Tests/LocalDevelopmentRunTests.sh
       - name: Verify release version stamping
         run: Tests/ReleaseVersioningTests.sh
       - name: Run Swift tests
