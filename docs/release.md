@@ -12,9 +12,10 @@ new app build is signed and notarized again; this is code-signing trust, not enc
 published archives are not rebuilt.
 
 For local development replacement, stop the running app and remove only the previous local
-`CodexChineseVoice.app` before copying the fresh bundle to `dist/CodexChineseVoice.app`. Do not
-delete source files, user configuration, or GitHub Release assets. Keeping one local app bundle
-registered with LaunchServices prevents macOS from opening a stale duplicate.
+`CodexChineseVoice Dev.app` before copying the fresh bundle to
+`dist/CodexChineseVoice Dev.app`. Do not delete source files, user configuration, production app
+bundles, or GitHub Release assets. Keeping one local development bundle registered with
+LaunchServices prevents macOS from opening a stale duplicate.
 
 ## Context7-first changes
 

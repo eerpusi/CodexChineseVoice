@@ -9,6 +9,17 @@ final class ComposerPlaceholderTests: XCTestCase {
         )
     }
 
+    func testSemanticFallbackLabelIsTreatedAsEmptyComposer() {
+        XCTAssertEqual(
+            normalizedComposerValue(
+                "随心输入",
+                placeholder: nil,
+                semanticLabels: ["随心输入"]
+            ),
+            ""
+        )
+    }
+
     func testRealTextIsPreservedWhenItDiffersFromPlaceholder() {
         XCTAssertEqual(
             normalizedComposerValue("Work with ChatGPT now", placeholder: "Work with ChatGPT"),

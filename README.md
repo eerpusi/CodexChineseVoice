@@ -36,22 +36,21 @@ For local development, build and launch the app bundle with:
 ./script/build_and_run.sh
 ```
 
+This creates and launches `dist/CodexChineseVoice Dev.app`, a development-only app with a separate
+bundle identifier. It can run alongside the production `CodexChineseVoice.app` installed from
+Homebrew or a release zip.
+
 Starting with `v0.1.1`, the release contains only the signed and notarized
 `CodexChineseVoice.app`; it does not install a terminal command.
 Open the app once, then use its menu bar item to configure the provider key, permissions, and
 whether completed transcriptions are sent automatically.
 
-The provider key is read from `ARK_PLAN_API_KEY` first. A local fallback file is supported at:
-
-```text
-~/.config/codex-chinese-voice/config.toml
-```
-
-Its minimal format is:
-
-```toml
-ark_plan_api_key = "your-key"
-```
+The app stores a saved provider key in the macOS Keychain. `ARK_PLAN_API_KEY` takes priority for
+the current process, which is useful for temporary local runs and is never persisted by the app.
+On first use after upgrading, a legacy local configuration at
+`~/.config/codex-chinese-voice/config.toml` is copied into Keychain and deleted only after the
+Keychain write succeeds. The Settings window can clear the saved Keychain key without displaying
+its value.
 
 Do not put a real key in the repository, shell profile, issue, or log. Export it only in the
 terminal session that launches the utility when possible.
@@ -86,9 +85,9 @@ Release builds receive their app version from `VERSION` and their incrementing b
 
 The production bundle identifier is permanently `com.lianenguang.CodexChineseVoice`. Each new
 distributable build is signed and notarized independently; this is signing and notarization, not
-encryption, and historical release archives remain unchanged. Local replacement removes the old
-development `.app` before launching the fresh `dist/CodexChineseVoice.app` so macOS cannot choose a
-stale duplicate.
+encryption, and historical release archives remain unchanged. Local replacement removes only the
+old `dist/CodexChineseVoice Dev.app` before launching its fresh replacement, so it does not disturb
+an installed production app.
 
 Before implementation or other state-changing work, maintainers query current Context7
 documentation and record the result in a design or research note. A prior query in the same Codex

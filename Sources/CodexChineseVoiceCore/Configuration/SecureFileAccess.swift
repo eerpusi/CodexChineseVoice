@@ -80,6 +80,48 @@ enum SecureFileAccess {
         committed = true
     }
 
+    static func remove(at url: URL) throws {
+        let path = try SecurePath(url: url)
+        let parentFD: Int32
+        do {
+            parentFD = try SecureFileAccessIO.openParent(
+                directoryComponents: path.directoryComponents,
+                create: false
+            )
+        } catch SecureFileAccessError.missing {
+            return
+        }
+        defer { close(parentFD) }
+
+        let fileFD: Int32
+        do {
+            fileFD = try SecureFileAccessIO.openFile(
+                path.fileName,
+                relativeTo: parentFD
+            )
+        } catch SecureFileAccessError.missing {
+            return
+        }
+        defer { close(fileFD) }
+
+        var info = stat()
+        guard fstat(fileFD, &info) == 0,
+              info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else {
+            throw SecureFileAccessError.unreadable
+        }
+        try SecureFileAccessIO.rejectExistingSymlink(
+            path.fileName,
+            relativeTo: parentFD
+        )
+        let result = SecureFileAccessIO.unlink(
+            path.fileName,
+            relativeTo: parentFD
+        )
+        guard result == 0 || errno == ENOENT else {
+            throw SecureFileAccessError.unreadable
+        }
+    }
+
     static func withExclusiveLock<Result>(
         at url: URL,
         operation: () throws -> Result

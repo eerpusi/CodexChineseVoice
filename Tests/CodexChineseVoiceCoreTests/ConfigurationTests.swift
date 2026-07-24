@@ -3,9 +3,10 @@ import XCTest
 @testable import CodexChineseVoiceCore
 
 final class ConfigurationTests: XCTestCase {
-    func testEnvironmentAPIKeyOverridesSavedAPIKey() throws {
+    func testEnvironmentAPIKeyOverridesKeychainAndLegacyKey() throws {
         let loader = ConfigurationLoader(
-            store: StubStore(apiKey: "saved-key"),
+            keychain: StubStore(apiKey: "keychain-key"),
+            legacy: StubStore(apiKey: "legacy-key"),
             environment: ["ARK_PLAN_API_KEY": "environment-key"]
         )
 
@@ -13,6 +14,62 @@ final class ConfigurationTests: XCTestCase {
             try loader.load(),
             AppConfiguration(apiKey: "environment-key")
         )
+    }
+
+    func testKeychainAPIKeyOverridesLegacyKey() throws {
+        let loader = ConfigurationLoader(
+            keychain: StubStore(apiKey: "keychain-key"),
+            legacy: StubStore(apiKey: "legacy-key"),
+            environment: [:]
+        )
+
+        XCTAssertEqual(try loader.load(), AppConfiguration(apiKey: "keychain-key"))
+    }
+
+    func testMissingKeychainAndLegacyAPIKeyThrows() {
+        let loader = ConfigurationLoader(
+            keychain: StubStore(apiKey: nil),
+            legacy: StubStore(apiKey: nil),
+            environment: [:]
+        )
+
+        XCTAssertThrowsError(try loader.load()) { error in
+            XCTAssertEqual(error as? ConfigurationError, .missingAPIKey)
+        }
+    }
+
+    func testLegacyKeyMigratesToKeychainBeforeDeletion() throws {
+        let keychain = MigrationStore(apiKey: nil)
+        let legacy = MigrationStore(apiKey: "legacy-key")
+        let loader = ConfigurationLoader(
+            keychain: keychain,
+            legacy: legacy,
+            environment: [:]
+        )
+
+        XCTAssertEqual(try loader.load(), AppConfiguration(apiKey: "legacy-key"))
+        XCTAssertEqual(keychain.savedAPIKeys, ["legacy-key"])
+        XCTAssertEqual(legacy.deleteCallCount, 1)
+        XCTAssertNil(legacy.apiKey)
+    }
+
+    func testLegacyKeyRemainsWhenKeychainSaveFails() {
+        let keychain = MigrationStore(
+            apiKey: nil,
+            saveError: .keychainAccessFailed
+        )
+        let legacy = MigrationStore(apiKey: "legacy-key")
+        let loader = ConfigurationLoader(
+            keychain: keychain,
+            legacy: legacy,
+            environment: [:]
+        )
+
+        XCTAssertThrowsError(try loader.load()) { error in
+            XCTAssertEqual(error as? ConfigurationError, .keychainAccessFailed)
+        }
+        XCTAssertEqual(legacy.deleteCallCount, 0)
+        XCTAssertEqual(legacy.apiKey, "legacy-key")
     }
 
     func testEmptyEnvironmentAPIKeyFallsBackToSavedAPIKey() throws {
@@ -182,10 +239,10 @@ final class ConfigurationTests: XCTestCase {
         }
     }
 
-    func testValidEnvironmentAPIKeyDoesNotInvokeStore() throws {
-        let store = ThrowingStore()
+    func testEnvironmentAPIKeyDoesNotAccessKeychainOrLegacyStorage() throws {
         let loader = ConfigurationLoader(
-            store: store,
+            keychain: ThrowingStore(),
+            legacy: ThrowingStore(),
             environment: ["ARK_PLAN_API_KEY": "environment-key"]
         )
 
@@ -193,7 +250,6 @@ final class ConfigurationTests: XCTestCase {
             try loader.load(),
             AppConfiguration(apiKey: "environment-key")
         )
-        XCTAssertEqual(store.loadCount, 0)
     }
 
     func testDefaultStoreUsesExpectedPath() {
@@ -212,18 +268,56 @@ private struct StubStore: ConfigStoring {
     func loadAPIKey() throws -> String? {
         apiKey
     }
+
+    func saveAPIKey(_ apiKey: String) throws {}
+
+    func deleteAPIKey() throws {}
 }
 
-private final class ThrowingStore: ConfigStoring {
-    enum Failure: Error {
-        case storeShouldNotBeCalled
+private final class MigrationStore: ConfigStoring, @unchecked Sendable {
+    var apiKey: String?
+    let saveError: ConfigurationError?
+    private(set) var savedAPIKeys: [String] = []
+    private(set) var deleteCallCount = 0
+
+    init(apiKey: String?, saveError: ConfigurationError? = nil) {
+        self.apiKey = apiKey
+        self.saveError = saveError
     }
 
-    private(set) var loadCount = 0
+    func loadAPIKey() throws -> String? {
+        apiKey
+    }
+
+    func saveAPIKey(_ apiKey: String) throws {
+        if let saveError {
+            throw saveError
+        }
+        savedAPIKeys.append(apiKey)
+        self.apiKey = apiKey
+    }
+
+    func deleteAPIKey() throws {
+        deleteCallCount += 1
+        apiKey = nil
+    }
+}
+
+private struct ThrowingStore: ConfigStoring {
+    enum Failure: Error {
+        case storageShouldNotBeCalled
+    }
 
     func loadAPIKey() throws -> String? {
-        loadCount += 1
-        throw Failure.storeShouldNotBeCalled
+        throw Failure.storageShouldNotBeCalled
+    }
+
+    func saveAPIKey(_ apiKey: String) throws {
+        throw Failure.storageShouldNotBeCalled
+    }
+
+    func deleteAPIKey() throws {
+        throw Failure.storageShouldNotBeCalled
     }
 }
 

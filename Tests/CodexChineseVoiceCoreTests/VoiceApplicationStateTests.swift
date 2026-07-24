@@ -15,6 +15,10 @@ final class VoiceApplicationStateTests: XCTestCase {
             VoiceApplicationState.from(.invalidFile),
             .failed(.configurationInvalid)
         )
+        XCTAssertEqual(
+            VoiceApplicationState.from(.keychainAccessFailed),
+            .failed(.configurationKeychainUnavailable)
+        )
     }
 
     func testPermissionErrorsMapToTheirRequiredActions() {

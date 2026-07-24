@@ -22,7 +22,7 @@ struct AppSettingsView: View {
                 if let maskedKey = APIKeyPresentation.maskedValue(
                     isConfigured: model.hasConfiguredAPIKey || didSaveAPIKey
                 ) {
-                    LabeledContent("已保存") {
+                    LabeledContent("已配置") {
                         Text(maskedKey)
                             .monospaced()
                             .foregroundStyle(.secondary)
@@ -49,6 +49,18 @@ struct AppSettingsView: View {
                     Label("保存 Key", systemImage: "key")
                 }
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button(role: .destructive) {
+                    do {
+                        try model.clearSavedAPIKey()
+                        didSaveAPIKey = false
+                        saveError = nil
+                    } catch {
+                        saveError = "清除已保存的 Key 失败"
+                    }
+                } label: {
+                    Label("清除已保存的 Key", systemImage: "trash")
+                }
+                .disabled(!(model.hasConfiguredAPIKey || didSaveAPIKey))
                 if let saveError {
                     Text(saveError)
                         .foregroundStyle(.red)

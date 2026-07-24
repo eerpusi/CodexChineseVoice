@@ -2,25 +2,31 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="CodexChineseVoice"
-BUNDLE_ID="com.lianenguang.CodexChineseVoice"
+PRODUCT_NAME="CodexChineseVoice"
+APP_NAME="CodexChineseVoice Dev"
+EXECUTABLE_NAME="CodexChineseVoiceDev"
+BUNDLE_ID="com.lianenguang.CodexChineseVoice.dev"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${ROOT_DIR}/dist"
 APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 APP_CONTENTS="${APP_BUNDLE}/Contents"
 APP_MACOS="${APP_CONTENTS}/MacOS"
 APP_RESOURCES="${APP_CONTENTS}/Resources"
-APP_BINARY="${APP_MACOS}/${APP_NAME}"
+APP_BINARY="${APP_MACOS}/${EXECUTABLE_NAME}"
 
-pkill -x "${APP_NAME}" >/dev/null 2>&1 || true
-swift build --product "${APP_NAME}"
-BUILD_BINARY="$(swift build --show-bin-path)/${APP_NAME}"
+pkill -x "${EXECUTABLE_NAME}" >/dev/null 2>&1 || true
+swift build --product "${PRODUCT_NAME}"
+BUILD_BINARY="$(swift build --show-bin-path)/${PRODUCT_NAME}"
 
 rm -rf "${APP_BUNDLE}"
 mkdir -p "${APP_MACOS}" "${APP_RESOURCES}"
 cp "${BUILD_BINARY}" "${APP_BINARY}"
 cp "${ROOT_DIR}/Packaging/AppIcon.icns" "${APP_RESOURCES}/AppIcon.icns"
 cp "${ROOT_DIR}/Packaging/Info.plist" "${APP_CONTENTS}/Info.plist"
+plutil -replace CFBundleDisplayName -string "${APP_NAME}" "${APP_CONTENTS}/Info.plist"
+plutil -replace CFBundleExecutable -string "${EXECUTABLE_NAME}" "${APP_CONTENTS}/Info.plist"
+plutil -replace CFBundleIdentifier -string "${BUNDLE_ID}" "${APP_CONTENTS}/Info.plist"
+plutil -replace CFBundleName -string "${EXECUTABLE_NAME}" "${APP_CONTENTS}/Info.plist"
 chmod +x "${APP_BINARY}"
 bash "${ROOT_DIR}/Scripts/sign-local-app.sh" "${APP_BUNDLE}"
 
@@ -32,7 +38,7 @@ verify_fresh_bundle() {
     local process_id
     local running_binary
 
-    for process_id in $(pgrep -x "${APP_NAME}"); do
+    for process_id in $(pgrep -x "${EXECUTABLE_NAME}"); do
         running_binary="$(/bin/ps -p "${process_id}" -o comm=)"
         if [[ "${running_binary}" == "${APP_BINARY}" ]]; then
             return 0
@@ -52,7 +58,7 @@ case "${MODE}" in
         ;;
     --logs|logs)
         open_app
-        /usr/bin/log stream --info --style compact --predicate "process == \"${APP_NAME}\""
+        /usr/bin/log stream --info --style compact --predicate "process == \"${EXECUTABLE_NAME}\""
         ;;
     --telemetry|telemetry)
         open_app

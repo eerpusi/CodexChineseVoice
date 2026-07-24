@@ -19,14 +19,18 @@ func selectComposerCandidate(
         ?? candidates.firstIndex { $0.isUsable }
 }
 
-func normalizedComposerValue(_ value: String, placeholder: String?) -> String {
+func normalizedComposerValue(
+    _ value: String,
+    placeholder: String?,
+    semanticLabels: [String] = []
+) -> String {
     let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    let trimmedPlaceholder = placeholder?.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmedValue.isEmpty { return "" }
-    if let trimmedPlaceholder, !trimmedPlaceholder.isEmpty, trimmedValue == trimmedPlaceholder {
-        return ""
-    }
-    if trimmedValue == "Work with ChatGPT" {
+    let labels = [placeholder].compactMap { $0 } + semanticLabels
+    if labels.contains(where: {
+        let trimmedLabel = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedLabel.isEmpty && trimmedValue == trimmedLabel
+    }) {
         return ""
     }
     return value

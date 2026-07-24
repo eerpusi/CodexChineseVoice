@@ -2,6 +2,17 @@
 
 Date: 2026-07-24
 
+## v0.1.2 candidate
+
+- API-key resolution uses `ARK_PLAN_API_KEY`, then macOS Keychain, then one-time legacy TOML
+  migration. Legacy data is deleted only after a successful Keychain save: PASS with deterministic
+  tests.
+- Keychain generic-password reads, initial writes, duplicate updates, deletion, and access failures:
+  PASS with a fake Security client and no user credential access.
+- Full Swift suite: PASS, 154 tests, 0 failures.
+- Manual saved-Keychain-key save/clear and legacy-file migration in the fresh development app:
+  NOT RUN. This remains a release gate so the maintainer can choose a disposable synthetic key.
+
 ## Automated
 
 - `swift test`: PASS, 144 tests, 0 failures after removing CLI-only lifecycle coverage.

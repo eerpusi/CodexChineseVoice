@@ -12,21 +12,41 @@ public enum ConfigurationError: Error, Equatable {
     case missingAPIKey
     case unreadableFile
     case invalidFile
+    case keychainAccessFailed
 }
 
-public protocol ConfigStoring {
+public protocol CredentialStoring: Sendable {
     func loadAPIKey() throws -> String?
+    func saveAPIKey(_ apiKey: String) throws
+    func deleteAPIKey() throws
 }
 
-public struct ConfigurationLoader<Store: ConfigStoring> {
-    private let store: Store
+public typealias ConfigStoring = CredentialStoring
+
+public struct EmptyConfigStore: CredentialStoring {
+    public init() {}
+
+    public func loadAPIKey() throws -> String? {
+        nil
+    }
+
+    public func saveAPIKey(_ apiKey: String) throws {}
+
+    public func deleteAPIKey() throws {}
+}
+
+public struct ConfigurationLoader<Keychain: CredentialStoring, Legacy: CredentialStoring> {
+    private let keychain: Keychain
+    private let legacy: Legacy
     private let environment: [String: String]
 
     public init(
-        store: Store,
+        keychain: Keychain,
+        legacy: Legacy,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
-        self.store = store
+        self.keychain = keychain
+        self.legacy = legacy
         self.environment = environment
     }
 
@@ -35,10 +55,29 @@ public struct ConfigurationLoader<Store: ConfigStoring> {
             return AppConfiguration(apiKey: apiKey)
         }
 
-        if let apiKey = try store.loadAPIKey(), !apiKey.isEmpty {
+        if let apiKey = try keychain.loadAPIKey(), !apiKey.isEmpty {
+            return AppConfiguration(apiKey: apiKey)
+        }
+
+        if let apiKey = try legacy.loadAPIKey(), !apiKey.isEmpty {
+            try keychain.saveAPIKey(apiKey)
+            try legacy.deleteAPIKey()
             return AppConfiguration(apiKey: apiKey)
         }
 
         throw ConfigurationError.missingAPIKey
+    }
+}
+
+public extension ConfigurationLoader where Keychain == EmptyConfigStore {
+    init(
+        store: Legacy,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        self.init(
+            keychain: EmptyConfigStore(),
+            legacy: store,
+            environment: environment
+        )
     }
 }

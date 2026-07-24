@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if ! rg -q 'verify-release-inputs\.sh' "${ROOT_DIR}/Scripts/release.sh"; then
+    echo "release pipeline must verify committed release inputs before building" >&2
+    exit 1
+fi
+
 VERSION="0.1.1" \
 BUILD_NUMBER="2" \
 GITHUB_REPOSITORY="example/CodexChineseVoice" \

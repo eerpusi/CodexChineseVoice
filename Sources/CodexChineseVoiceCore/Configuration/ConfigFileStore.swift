@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ConfigFileStore: ConfigStoring, Sendable {
+public struct ConfigFileStore: CredentialStoring, Sendable {
     private static let key = "ark_plan_api_key"
 
     public static let `default` = ConfigFileStore(
@@ -41,6 +41,14 @@ public struct ConfigFileStore: ConfigStoring, Sendable {
             try SecureFileAccess.write(Data(contents.utf8), to: fileURL)
         } catch let error as ConfigurationError {
             throw error
+        } catch {
+            throw ConfigurationError.unreadableFile
+        }
+    }
+
+    public func deleteAPIKey() throws {
+        do {
+            try SecureFileAccess.remove(at: fileURL)
         } catch {
             throw ConfigurationError.unreadableFile
         }

@@ -50,14 +50,21 @@ final class VoiceApplicationModel {
     func saveAPIKey(_ apiKey: String) throws {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else { return }
-        try ConfigFileStore.default.saveAPIKey(trimmedKey)
+        try KeychainCredentialStore.default.saveAPIKey(trimmedKey)
+        restart()
+    }
+
+    func clearSavedAPIKey() throws {
+        try KeychainCredentialStore.default.deleteAPIKey()
+        hasConfiguredAPIKey = false
         restart()
     }
 
     private func startRuntime() async {
         do {
             let configuration = try ConfigurationLoader(
-                store: ConfigFileStore.default
+                keychain: KeychainCredentialStore.default,
+                legacy: ConfigFileStore.default
             ).load()
             hasConfiguredAPIKey = true
 

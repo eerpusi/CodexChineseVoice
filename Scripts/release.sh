@@ -19,6 +19,7 @@ case "${MODE}" in
         bash "${ROOT_DIR}/Scripts/publish-release.sh" --check-only
         ;;
     --prepare|--publish)
+        bash "${ROOT_DIR}/Scripts/verify-release-inputs.sh"
         bash "${ROOT_DIR}/Scripts/build-app.sh"
         bash "${ROOT_DIR}/Scripts/notarize-release.sh"
         EXPECTED_VERSION="${VERSION}" \

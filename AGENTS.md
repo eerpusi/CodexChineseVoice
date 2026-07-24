@@ -30,8 +30,8 @@ integration or release checkpoints.
 - A new distributable app must be freshly code signed and notarized. Bundle identity is not
   encryption and does not allow a new binary to reuse an old binary's signature.
 - When replacing a local development app, remove the previous local `.app` before launching the
-  fresh `dist/CodexChineseVoice.app`. Do not remove source files, user data, or historical GitHub
-  release archives.
+  fresh `dist/CodexChineseVoice Dev.app`. Do not remove source files, user data, production app
+  bundles, or historical GitHub release archives.
 - Before implementation, build, signing, release, deletion, or another state-changing operation,
   query current Context7 documentation and record the conclusion in a design or research note.
   A prior query in the same Codex session may be reused for related work; query again when the
@@ -78,11 +78,11 @@ integration or release checkpoints.
   edit. Do not spend a long cycle on unrelated documentation or broad tests.
 - Keep each working slice as a reviewable diff with its verification result. Create a Git commit
   only when explicitly requested or at an agreed integration checkpoint.
-- After every behavior fix, terminate all existing `CodexChineseVoice` processes before manual
-  verification. Build exactly one fresh app bundle at `dist/CodexChineseVoice.app` from the primary
-  checkout and launch it by absolute path.
+- After every behavior fix, terminate all existing local-development `CodexChineseVoiceDev` processes
+  before manual verification. Build exactly one fresh app bundle at
+  `dist/CodexChineseVoice Dev.app` from the primary checkout and launch it by absolute path.
 - Before claiming manual verification, confirm the running process executable resolves to the new
-  `dist/CodexChineseVoice.app`, and verify its build timestamp or hash matches the fresh build.
+  `dist/CodexChineseVoice Dev.app`, and verify its build timestamp or hash matches the fresh build.
   Never validate a fix against an older, diagnostic, cached, or differently located app bundle.
 - If the same assumption or approach fails repeatedly, stop retrying it, inspect the evidence, and
   change the assumption, choose another approach, or report the blocker.

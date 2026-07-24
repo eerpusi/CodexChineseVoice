@@ -1,6 +1,7 @@
 public enum VoiceApplicationFailure: Equatable, Sendable {
     case configurationUnreadable
     case configurationInvalid
+    case configurationKeychainUnavailable
     case runtime(String)
 }
 
@@ -19,6 +20,8 @@ public enum VoiceApplicationState: Equatable, Sendable {
             "无法读取配置文件"
         case .failed(.configurationInvalid):
             "配置文件格式无效"
+        case .failed(.configurationKeychainUnavailable):
+            "无法访问系统钥匙串"
         case let .failed(.runtime(message)):
             message
         default:
@@ -36,6 +39,8 @@ public enum VoiceApplicationState: Equatable, Sendable {
             .failed(.configurationUnreadable)
         case .invalidFile:
             .failed(.configurationInvalid)
+        case .keychainAccessFailed:
+            .failed(.configurationKeychainUnavailable)
         }
     }
 

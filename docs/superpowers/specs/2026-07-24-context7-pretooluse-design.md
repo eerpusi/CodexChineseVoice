@@ -70,6 +70,12 @@ Distribution](https://developer.apple.com/documentation/xcode/preparing-your-app
 Context7's current Swift Package Manager documentation confirms that `swift build --show-bin-path`
 prints the build-products directory and may be used with the same relevant build arguments. The
 local run script therefore builds the named product first, obtains its binary from that directory,
-and stages exactly one app at `dist/CodexChineseVoice.app`. Its `--verify` mode also compares the
+and stages exactly one development app at `dist/CodexChineseVoice Dev.app`. Its `--verify` mode also compares the
 running process executable path to the binary inside that fresh bundle, rather than accepting any
 same-named process.
+
+Context7's current Apple Developer guidance describes `CFBundleIdentifier` as the system-wide app
+identifier. The local run script therefore stages a development-only app with a separate bundle
+identifier and executable name, while the source `Packaging/Info.plist` continues to define the
+unchanged production identifier for signed and notarized releases. This permits local and
+production installs to coexist without process or LaunchServices collisions.

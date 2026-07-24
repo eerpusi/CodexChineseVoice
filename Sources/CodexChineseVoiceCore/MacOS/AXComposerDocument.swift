@@ -47,12 +47,11 @@ final class AXComposerDocument: ComposerDocument {
         guard let rawValue = raw as? String else {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
-        let placeholder = (try? CodexComposerEditor.copyAttribute(
-            kAXPlaceholderValueAttribute,
-            from: element,
-            missing: .focusedElementNotEditable
-        )) as? String
-        return normalizedComposerValue(rawValue, placeholder: placeholder)
+        return normalizedComposerValue(
+            rawValue,
+            placeholder: nil,
+            semanticLabels: CodexComposerEditor.composerSemanticLabels(from: element)
+        )
     }
 
     func writeValue(_ value: String) throws {

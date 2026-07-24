@@ -49,6 +49,18 @@ final class ConfigurationSecurityTests: XCTestCase {
         XCTAssertEqual(try store.loadAPIKey(), "second-value")
     }
 
+    func testDeleteRemovesSavedFile() throws {
+        let location = makeTemporaryConfigLocation()
+        defer { try? FileManager.default.removeItem(at: location.root) }
+        let store = ConfigFileStore(fileURL: location.file)
+
+        try store.saveAPIKey("synthetic-key")
+        try store.deleteAPIKey()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.file.path))
+        XCTAssertNil(try store.loadAPIKey())
+    }
+
     func testLoadRejectsBroadlyReadableFile() throws {
         let location = makeTemporaryConfigLocation()
         defer { try? FileManager.default.removeItem(at: location.root) }

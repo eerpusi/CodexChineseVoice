@@ -82,12 +82,11 @@ extension CodexComposerEditor {
         guard let rawValue = valueRaw as? String else {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
-        let placeholder = (try? Self.copyAttribute(
-            kAXPlaceholderValueAttribute,
-            from: focused,
-            missing: .focusedElementNotEditable
-        )) as? String
-        let value = normalizedComposerValue(rawValue, placeholder: placeholder)
+        let value = normalizedComposerValue(
+            rawValue,
+            placeholder: nil,
+            semanticLabels: Self.composerSemanticLabels(from: focused)
+        )
         let selection = try selectionRange(from: focused)
         guard valid(selection, in: value) else {
             throw CodexInputBridgeError.invalidSelectionRange
@@ -188,6 +187,24 @@ extension CodexComposerEditor {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
         return number.boolValue
+    }
+
+    static func composerSemanticLabels(from element: AXUIElement) -> [String] {
+        [
+            kAXPlaceholderValueAttribute,
+            kAXDescriptionAttribute,
+            kAXTitleAttribute,
+            kAXHelpAttribute,
+        ].compactMap { attribute in
+            guard let raw = try? copyAttribute(
+                attribute,
+                from: element,
+                missing: .focusedElementNotEditable
+            ), let label = raw as? String else {
+                return nil
+            }
+            return label
+        }
     }
 
     static func copyAttribute(
