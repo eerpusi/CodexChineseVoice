@@ -122,3 +122,12 @@ integration or release checkpoints.
   documentation. Small, local changes do not require a separate design document.
 - Keep acceptance criteria and known limitations visible in the task or change notes.
 - Fix the root cause of failures, but do not broaden the change to unrelated cleanup.
+
+## Documentation Hygiene
+
+- Keep `README.md` as the single product-facing document. Release and acceptance records may retain
+  technical evidence, but do not create parallel product overviews.
+- Treat research notes, implementation plans, and diagnostics as temporary working material. At a
+  commit or release checkpoint, preserve durable decisions in the relevant product or release
+  document, then move completed temporary material to Trash.
+- Never clean up an active task document or a file the user explicitly asked to retain.
