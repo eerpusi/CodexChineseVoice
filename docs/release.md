@@ -120,6 +120,9 @@ services rather than relying on local command startup:
   Gatekeeper validation, universal-architecture checks, and artifact tests passed.
 - GitHub Release and the remote Homebrew Cask both resolve to ZIP SHA-256
   `daf1e3b81df0bb3ab9559d0c781d0e5ff3577901d19a5997bd228cca1e5af1d4`.
+- Context7 Homebrew guidance confirms `brew cat` for Cask inspection and `brew fetch` for download
+  verification without installation. After refreshing the local Tap, fetching Cask `0.1.3`
+  completed successfully without replacing the installed application.
 - The Release was initially created before the primary branch push, so GitHub created `v0.1.3`
   from the previous remote `main`. Recovery: push the release commit and move the new tag to that
   commit without replacing the notarized assets. Prevention: publication now requires local HEAD
