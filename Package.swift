@@ -13,20 +13,12 @@ let package = Package(
             targets: ["CodexChineseVoiceCore"]
         ),
         .executable(
-            name: "codex-chinese-voice",
-            targets: ["CodexChineseVoiceCLI"]
-        ),
-        .executable(
             name: "CodexChineseVoice",
             targets: ["CodexChineseVoiceApp"]
         ),
     ],
     targets: [
         .target(name: "CodexChineseVoiceCore"),
-        .executableTarget(
-            name: "CodexChineseVoiceCLI",
-            dependencies: ["CodexChineseVoiceCore"]
-        ),
         .executableTarget(
             name: "CodexChineseVoiceApp",
             dependencies: ["CodexChineseVoiceCore"]

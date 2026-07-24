@@ -24,7 +24,6 @@ mkdir -p "$(dirname "${OUTPUT}")"
     printf '  desc "Chinese voice input for the Codex macOS app"\n'
     printf '  homepage "https://github.com/%s/%s"\n' "${OWNER}" "${REPOSITORY}"
     printf '  app "CodexChineseVoice.app"\n'
-    printf '  binary "#{appdir}/CodexChineseVoice.app/Contents/Helpers/codex-chinese-voice"\n'
     printf 'end\n'
 } > "${OUTPUT}"
 

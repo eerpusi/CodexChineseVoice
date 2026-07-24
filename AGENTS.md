@@ -23,6 +23,23 @@ integration or release checkpoints.
 - Do not modify the user's shell profile or persist credentials without explicit authorization at
   action time.
 
+## Release Identity And Research Gate
+
+- Keep the production bundle identifier stable across every version:
+  `com.lianenguang.CodexChineseVoice`.
+- A new distributable app must be freshly code signed and notarized. Bundle identity is not
+  encryption and does not allow a new binary to reuse an old binary's signature.
+- When replacing a local development app, remove the previous local `.app` before launching the
+  fresh `dist/CodexChineseVoice.app`. Do not remove source files, user data, or historical GitHub
+  release archives.
+- Before implementation, build, signing, release, deletion, or another state-changing operation,
+  query current Context7 documentation and record the conclusion in a design or research note.
+  A prior query in the same Codex session may be reused for related work; query again when the
+  framework, API, release concern, or other subject changes.
+- The project `.codex/hooks.json` installs a `PreToolUse` gate for `apply_patch` and mutating Bash
+  commands. Read-only inspection and Context7 queries remain available before the gate is satisfied.
+- If Codex asks to trust the project hook, inspect the hook and approve it before making changes.
+
 ## Architecture
 
 - Keep microphone capture, hotkey handling, ASR transport, transcript editing, and app lifecycle in
@@ -34,6 +51,10 @@ integration or release checkpoints.
 
 ## Fast Delivery Workflow
 
+- Git worktrees are prohibited. Work only in the primary repository checkout; do not create, enter,
+  read from, write to, build in, test in, or run Git commands against any auxiliary worktree.
+- If an auxiliary worktree already exists, report it and stop before interacting with it. Remove it
+  only after receiving explicit user authorization and preserving any user-owned changes.
 - Before editing, define the observable result, allowed scope, relevant acceptance check, and any
   condition that requires stopping for user input. A simple task may express this in one sentence.
 - Load only the project rules, files, adjacent interfaces, examples, and failure output needed for
@@ -57,10 +78,16 @@ integration or release checkpoints.
   edit. Do not spend a long cycle on unrelated documentation or broad tests.
 - Keep each working slice as a reviewable diff with its verification result. Create a Git commit
   only when explicitly requested or at an agreed integration checkpoint.
+- After every behavior fix, terminate all existing `CodexChineseVoice` processes before manual
+  verification. Build exactly one fresh app bundle at `dist/CodexChineseVoice.app` from the primary
+  checkout and launch it by absolute path.
+- Before claiming manual verification, confirm the running process executable resolves to the new
+  `dist/CodexChineseVoice.app`, and verify its build timestamp or hash matches the fresh build.
+  Never validate a fix against an older, diagnostic, cached, or differently located app bundle.
 - If the same assumption or approach fails repeatedly, stop retrying it, inspect the evidence, and
   change the assumption, choose another approach, or report the blocker.
 - Parallelize only tasks with separate files or interfaces, independent verification, and low merge
-  cost. Do not let multiple agents edit the same file in a shared worktree.
+  cost. Do not let multiple agents edit the same file in the shared primary checkout.
 - Long-running commands must remain observable and cancellable. There is no universal fixed timeout;
   use a budget appropriate to the command and do not restart a healthy process merely because it is
   slow.

@@ -1,24 +1,29 @@
 # Release Acceptance
 
-Date: 2026-07-23
+Date: 2026-07-24
 
 ## Automated
 
-- `swift test`: PASS, 192 tests, 0 failures.
+- `swift test`: PASS, 138 tests, 0 failures after removing CLI-only lifecycle coverage.
 - Auto-send preference default, persistence, disabled behavior, exactly-once completion, and
   ineligible-session safeguards: PASS with deterministic tests.
-- Universal app and bundled CLI (`arm64`, `x86_64`): PASS.
+- App-only SwiftPM manifest with no CLI product or target: PASS.
+- Universal app (`arm64`, `x86_64`) containing only the main executable and resources: PASS.
+- Release version stamping (`CFBundleShortVersionString=0.1.1`, `CFBundleVersion=2`): PASS.
 - Native app bundle build, LaunchServices launch, and process verification on the macOS host: PASS.
-- CLI `--help`, `status`, and `stop` smoke checks without an API key: PASS.
+- Homebrew Cask generation with an app stanza and no binary stanza: PASS.
 - App bundle structure, Info.plist, code-signature integrity, checksum, secret/config exclusion:
-  PASS for the local ad-hoc artifact.
+  PASS for the local Developer ID-signed `v0.1.1` candidate.
 - Notarization command orchestration: PASS with deterministic tool doubles.
 - GitHub Release and Homebrew Tap input validation: PASS without external mutation.
 
 ## External release gates
 
-- Developer ID Application signing: NOT RUN. No valid signing identity is currently installed.
-- Apple notarization and stapling: NOT RUN.
+- The signed and notarized `v0.1.0` release remains published with its original artifact.
+- Developer ID signing and Hardened Runtime for app-only `v0.1.1`: PASS locally with team
+  `DYT47RAAJW`.
+- Apple notarization, GitHub publication, and Tap update for app-only `v0.1.1`: NOT RUN. The
+  Keychain notarization profile is valid, but no new submission was made during local preparation.
 - Real Volcengine provider test with repository-owned synthetic audio: NOT RUN; requires explicit
   authorization and a valid `ARK_PLAN_API_KEY`.
 - Real Codex end-to-end test: NOT RUN for the final signed artifact. Must verify Codex-only
@@ -26,8 +31,7 @@ Date: 2026-07-23
   unrelated composer text, and cancellation. With auto-send enabled, each successful non-empty
   final transcription must send exactly once; with it disabled, final text must remain in the
   composer. Partial, empty, failed, cancelled, stale, and unfocused sessions must never send.
-- GitHub Release publication: NOT RUN. GitHub CLI authentication and repository remote are missing.
-- Homebrew Tap clean install/upgrade/uninstall: NOT RUN until the GitHub Release exists.
+- Homebrew Tap clean install/upgrade/uninstall for `v0.1.1`: NOT RUN until that release exists.
 
 The native Settings window and menu bar UI have been inspected on the macOS host. macOS desktop
 apps do not use an iOS-style simulator; host execution is the applicable GUI test environment.

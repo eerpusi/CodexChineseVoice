@@ -20,19 +20,24 @@ Provider credentials remain local and are never bundled with the executable.
 
 This is a native SwiftPM macOS app, not an Electron or WebView application.
 
-After the first public release, install both the menu bar app and its optional CLI with:
+Install the signed and notarized menu bar app with:
 
 ```bash
 brew install --cask eerpusi/tap/codex-chinese-voice
 ```
 
-Until that release exists, build and launch the local app bundle with:
+Alternatively, download `CodexChineseVoice-macos.zip` from the
+[GitHub Releases page](https://github.com/eerpusi/CodexChineseVoice/releases), extract it, and move
+`CodexChineseVoice.app` to `/Applications`.
+
+For local development, build and launch the app bundle with:
 
 ```bash
 ./script/build_and_run.sh
 ```
 
-The release app is distributed as a signed and notarized `CodexChineseVoice.app` archive.
+Starting with `v0.1.1`, the release contains only the signed and notarized
+`CodexChineseVoice.app`; it does not install a terminal command.
 Open the app once, then use its menu bar item to configure the provider key, permissions, and
 whether completed transcriptions are sent automatically.
 
@@ -66,9 +71,27 @@ gating, audio framing, Volcengine protocol/provider behavior, composer replaceme
 cancellation, configurable final-transcript submission, and app presentation preferences. Local
 universal unsigned app bundles can be built with `Scripts/build-app.sh --unsigned`.
 
-Real-provider calls, signed/notarized distribution, and end-to-end interaction with a real Codex
-input field remain release gates. Do not treat an unsigned local bundle as a production release.
+The signed and notarized `v0.1.0` release is public. The next release is app-only and removes the
+legacy CLI from SwiftPM, the app bundle, and Homebrew. Real-provider calls and end-to-end
+interaction with a real Codex input field remain manual acceptance gates for each release.
 
 Maintainers can run the complete signed, notarized, GitHub Release, and Homebrew Tap pipeline with
 `Scripts/release.sh --publish` after configuring the prerequisites in
 [`docs/release.md`](docs/release.md).
+
+Release builds receive their app version from `VERSION` and their incrementing build number from
+`BUILD_NUMBER`; the packaging script writes both values into the generated app bundle.
+
+## Maintainer rules
+
+The production bundle identifier is permanently `com.lianenguang.CodexChineseVoice`. Each new
+distributable build is signed and notarized independently; this is signing and notarization, not
+encryption, and historical release archives remain unchanged. Local replacement removes the old
+development `.app` before launching the fresh `dist/CodexChineseVoice.app` so macOS cannot choose a
+stale duplicate.
+
+Before implementation or other state-changing work, maintainers query current Context7
+documentation and record the result in a design or research note. A prior query in the same Codex
+session can be reused for related work; query again when the subject changes. The project PreToolUse
+hook enforces this requirement for code edits and mutating shell commands. Read-only inspection
+and Context7 queries remain available while research is being gathered.
