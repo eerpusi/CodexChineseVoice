@@ -109,10 +109,19 @@ services rather than relying on local command startup:
   at `0.1.1`. Recovery: compare the remote Cask against the Release asset digest, then update the
   Cask through the GitHub contents API and verify its raw remote content.
 
-### v0.1.3 preparation
+### v0.1.3
 
 - Context7 GitHub CLI research confirms that `gh release create` can create a tagged release and
   upload the ZIP and checksum assets together; `gh release upload --clobber` is reserved for an
   intentional replacement of an existing asset. This release uses a new `v0.1.3` tag.
 - The compact single-panel settings UI was manually inspected in the fresh development bundle;
   preference switches share a trailing edge and the Key field remains masked.
+- Apple notarization accepted submission `ee4309d7-a959-48ef-b742-9773721ab749`; stapling,
+  Gatekeeper validation, universal-architecture checks, and artifact tests passed.
+- GitHub Release and the remote Homebrew Cask both resolve to ZIP SHA-256
+  `daf1e3b81df0bb3ab9559d0c781d0e5ff3577901d19a5997bd228cca1e5af1d4`.
+- The Release was initially created before the primary branch push, so GitHub created `v0.1.3`
+  from the previous remote `main`. Recovery: push the release commit and move the new tag to that
+  commit without replacing the notarized assets. Prevention: publication now requires local HEAD
+  to match its upstream and passes the verified commit explicitly through `gh release create
+  --target`.

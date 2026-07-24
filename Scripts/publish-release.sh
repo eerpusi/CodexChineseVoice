@@ -34,6 +34,13 @@ if [[ "${MODE}" == "--check-only" ]]; then
     exit 0
 fi
 
+RELEASE_TARGET="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
+UPSTREAM_TARGET="$(git -C "${ROOT_DIR}" rev-parse '@{upstream}' 2>/dev/null || true)"
+[[ "${RELEASE_TARGET}" == "${UPSTREAM_TARGET}" ]] || {
+    echo "push the current commit to its upstream before publishing" >&2
+    exit 1
+}
+
 gh auth status
 TAG="v${VERSION}"
 if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
@@ -44,6 +51,7 @@ else
     gh release create "${TAG}" "${ARCHIVE_PATH}" "${CHECKSUM_PATH}" \
         --repo "${GITHUB_REPOSITORY}" \
         --title "CodexChineseVoice ${VERSION}" \
+        --target "${RELEASE_TARGET}" \
         --generate-notes
 fi
 

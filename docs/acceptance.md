@@ -38,6 +38,9 @@ Date: 2026-07-24
 
 ## External release gates
 
+- Developer ID signing, Apple notarization, GitHub Release publication, and Homebrew Cask update
+  for `v0.1.3`: PASS. The remote tag points to the release commit and the Cask SHA-256 matches the
+  published ZIP asset.
 - The signed and notarized `v0.1.0` release remains published with its original artifact.
 - Developer ID signing and Hardened Runtime for app-only `v0.1.1`: PASS locally with team
   `DYT47RAAJW`.
