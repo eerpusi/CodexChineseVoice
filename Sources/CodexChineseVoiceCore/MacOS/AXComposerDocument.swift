@@ -5,15 +5,19 @@ final class AXComposerDocument: ComposerDocument {
     private let element: AXUIElement
     private let focusRoot: AXUIElement?
     private let allowsApplicationTreeFocus: Bool
+    private let placeholderValue: String?
+    private var lastWrittenValue: String?
 
     init(
         element: AXUIElement,
         focusRoot: AXUIElement? = nil,
-        allowsApplicationTreeFocus: Bool = false
+        allowsApplicationTreeFocus: Bool = false,
+        placeholderValue: String? = nil
     ) {
         self.element = element
         self.focusRoot = focusRoot
         self.allowsApplicationTreeFocus = allowsApplicationTreeFocus
+        self.placeholderValue = placeholderValue
     }
 
     func isFocused(in processID: pid_t) throws -> Bool {
@@ -47,11 +51,14 @@ final class AXComposerDocument: ComposerDocument {
         guard let rawValue = raw as? String else {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
-        return normalizedComposerValue(
-            rawValue,
-            placeholder: nil,
-            semanticLabels: CodexComposerEditor.composerSemanticLabels(from: element)
-        )
+        if let knownValue = knownComposerDocumentValue(
+            rawValue: rawValue,
+            placeholderValue: placeholderValue,
+            lastWrittenValue: lastWrittenValue
+        ) {
+            return knownValue
+        }
+        return try CodexComposerEditor.resolvedComposerValue(rawValue, from: element)
     }
 
     func writeValue(_ value: String) throws {
@@ -60,6 +67,7 @@ final class AXComposerDocument: ComposerDocument {
             value: value as CFTypeRef,
             on: element
         )
+        lastWrittenValue = value
     }
 
     func writeSelection(_ range: NSRange) throws {

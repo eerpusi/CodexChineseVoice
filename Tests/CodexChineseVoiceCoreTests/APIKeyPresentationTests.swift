@@ -12,4 +12,9 @@ final class APIKeyPresentationTests: XCTestCase {
     func testMissingKeyHasNoMaskedValue() {
         XCTAssertNil(APIKeyPresentation.maskedValue(isConfigured: false))
     }
+
+    func testInputPromptShowsMaskOnlyForSavedCredential() {
+        XCTAssertEqual(APIKeyPresentation.inputPrompt(isConfigured: true), "********")
+        XCTAssertEqual(APIKeyPresentation.inputPrompt(isConfigured: false), "")
+    }
 }

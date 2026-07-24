@@ -33,13 +33,13 @@ final class AppPresentationPreferencesTests: XCTestCase {
         )
     }
 
-    func testAutoSendIsEnabledByDefault() {
+    func testAutoSendIsDisabledByDefault() {
         let (defaults, suiteName) = makeDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let preferences = AppPresentationPreferences.load(from: defaults)
 
-        XCTAssertTrue(preferences.autoSendsTranscription)
+        XCTAssertFalse(preferences.autoSendsTranscription)
     }
 
     func testAutoSendRoundTripsThroughUserDefaults() {

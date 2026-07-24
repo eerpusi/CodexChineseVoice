@@ -8,6 +8,7 @@ public enum CodexInputBridgeError: Error, LocalizedError, Equatable, Sendable {
     case codexNotFrontmost
     case noFocusedComposer
     case focusedElementNotEditable
+    case ambiguousComposerValue
     case accessibilityFailure(Int32)
     case invalidSelectionRange
     case textChangedExternally
@@ -28,6 +29,8 @@ public enum CodexInputBridgeError: Error, LocalizedError, Equatable, Sendable {
             "请先在 ChatGPT 中点击消息输入框"
         case .focusedElementNotEditable:
             "当前焦点不是可编辑的 ChatGPT 输入框"
+        case .ambiguousComposerValue:
+            "无法确认输入框是否为空，已停止写入以保护现有内容"
         case let .accessibilityFailure(status):
             "读取 ChatGPT 输入框失败（辅助功能错误 \(status)）"
         case .invalidSelectionRange:

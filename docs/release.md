@@ -56,8 +56,8 @@ Set release metadata only for the current terminal session:
 ```bash
 export CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 export NOTARYTOOL_PROFILE="codex-chinese-voice"
-export VERSION="0.1.1"
-export BUILD_NUMBER="2"
+export VERSION="0.1.3"
+export BUILD_NUMBER="3"
 export GITHUB_REPOSITORY="eerpusi/CodexChineseVoice"
 export HOMEBREW_TAP_REPOSITORY="eerpusi/homebrew-tap"
 ```
@@ -108,3 +108,11 @@ services rather than relying on local command startup:
 - The GitHub Release assets were created before the Tap update completed, leaving the remote Cask
   at `0.1.1`. Recovery: compare the remote Cask against the Release asset digest, then update the
   Cask through the GitHub contents API and verify its raw remote content.
+
+### v0.1.3 preparation
+
+- Context7 GitHub CLI research confirms that `gh release create` can create a tagged release and
+  upload the ZIP and checksum assets together; `gh release upload --clobber` is reserved for an
+  intentional replacement of an existing asset. This release uses a new `v0.1.3` tag.
+- The compact single-panel settings UI was manually inspected in the fresh development bundle;
+  preference switches share a trailing edge and the Key field remains masked.

@@ -2,6 +2,14 @@
 
 Date: 2026-07-24
 
+## v0.1.3 candidate
+
+- Compact single-panel Settings UI with leading labels, trailing switches, and a contiguous Key
+  input/save row: PASS in the fresh development bundle.
+- API Key presentation remains masked as `********`; real credentials were not read or printed:
+  PASS with focused tests and manual inspection.
+- Full Swift suite: PASS, 162 core tests and 9 app tests, 0 failures.
+
 ## v0.1.2 candidate
 
 - API-key resolution uses `ARK_PLAN_API_KEY`, then macOS Keychain, then one-time legacy TOML

@@ -12,6 +12,12 @@ struct ComposerAccessibilityCandidate: Equatable {
     }
 }
 
+enum ComposerValueResolution: Equatable {
+    case empty
+    case text(String)
+    case ambiguous
+}
+
 func selectComposerCandidate(
     _ candidates: [ComposerAccessibilityCandidate]
 ) -> Int? {
@@ -34,4 +40,27 @@ func normalizedComposerValue(
         return ""
     }
     return value
+}
+
+func resolveComposerValue(
+    _ value: String,
+    placeholder: String?,
+    semanticLabels: [String] = [],
+    characterCount: Int?
+) -> ComposerValueResolution {
+    if characterCount == 0 {
+        return .empty
+    }
+    let normalized = normalizedComposerValue(
+        value,
+        placeholder: placeholder,
+        semanticLabels: semanticLabels
+    )
+    if normalized.isEmpty {
+        return .empty
+    }
+    if characterCount == nil && semanticLabels.isEmpty && placeholder == nil {
+        return .ambiguous
+    }
+    return .text(normalized)
 }

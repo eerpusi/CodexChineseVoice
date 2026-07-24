@@ -5,10 +5,12 @@ import CodexChineseVoiceCore
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     let model = VoiceApplicationModel()
     private var workspaceActivationObserver: NSObjectProtocol?
+    private var statusBarController: StatusBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let preferences = AppPresentationPreferences.load()
         DockIconController.apply(preferences.activationMode)
+        statusBarController = StatusBarController(model: model)
         model.start()
         workspaceActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,

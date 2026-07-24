@@ -82,20 +82,26 @@ extension CodexComposerEditor {
         guard let rawValue = valueRaw as? String else {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
-        let value = normalizedComposerValue(
+        let characterCount = Self.characterCount(from: focused)
+        let value = try Self.resolvedComposerValue(
             rawValue,
-            placeholder: nil,
-            semanticLabels: Self.composerSemanticLabels(from: focused)
+            from: focused,
+            characterCount: characterCount
         )
         let selection = try selectionRange(from: focused)
-        guard valid(selection, in: value) else {
+        guard let selection = canonicalComposerSelection(
+            selection,
+            resolvedValue: value,
+            characterCount: characterCount
+        ) else {
             throw CodexInputBridgeError.invalidSelectionRange
         }
         return ComposerSeed(
             document: AXComposerDocument(
                 element: focused,
                 focusRoot: reportedFocus,
-                allowsApplicationTreeFocus: reportedFocus == nil
+                allowsApplicationTreeFocus: reportedFocus == nil,
+                placeholderValue: value.isEmpty ? rawValue : nil
             ),
             processID: processID,
             originalValue: value,
@@ -187,24 +193,6 @@ extension CodexComposerEditor {
             throw CodexInputBridgeError.focusedElementNotEditable
         }
         return number.boolValue
-    }
-
-    static func composerSemanticLabels(from element: AXUIElement) -> [String] {
-        [
-            kAXPlaceholderValueAttribute,
-            kAXDescriptionAttribute,
-            kAXTitleAttribute,
-            kAXHelpAttribute,
-        ].compactMap { attribute in
-            guard let raw = try? copyAttribute(
-                attribute,
-                from: element,
-                missing: .focusedElementNotEditable
-            ), let label = raw as? String else {
-                return nil
-            }
-            return label
-        }
     }
 
     static func copyAttribute(

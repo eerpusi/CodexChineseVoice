@@ -36,4 +36,11 @@ final class ComposerErrorDescriptionTests: XCTestCase {
             .focusedElementNotEditable
         )
     }
+
+    func testAmbiguousComposerValueExplainsThatWritingWasPrevented() {
+        XCTAssertEqual(
+            CodexInputBridgeError.ambiguousComposerValue.errorDescription,
+            "无法确认输入框是否为空，已停止写入以保护现有内容"
+        )
+    }
 }

@@ -14,7 +14,7 @@ public struct AppPresentationPreferences: Equatable, Sendable {
 
     public init(
         showsDockIcon: Bool = true,
-        autoSendsTranscription: Bool = true
+        autoSendsTranscription: Bool = false
     ) {
         self.showsDockIcon = showsDockIcon
         self.autoSendsTranscription = autoSendsTranscription
@@ -33,7 +33,7 @@ public struct AppPresentationPreferences: Equatable, Sendable {
         let autoSendsTranscription = defaults.object(
             forKey: autoSendsTranscriptionKey
         ) == nil
-            ? true
+            ? false
             : defaults.bool(forKey: autoSendsTranscriptionKey)
         return AppPresentationPreferences(
             showsDockIcon: showsDockIcon,

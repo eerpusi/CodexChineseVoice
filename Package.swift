@@ -27,5 +27,9 @@ let package = Package(
             name: "CodexChineseVoiceCoreTests",
             dependencies: ["CodexChineseVoiceCore"]
         ),
+        .testTarget(
+            name: "CodexChineseVoiceAppTests",
+            dependencies: ["CodexChineseVoiceApp"]
+        ),
     ]
 )
