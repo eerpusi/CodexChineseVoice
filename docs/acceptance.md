@@ -22,16 +22,16 @@ Date: 2026-07-24
 - The signed and notarized `v0.1.0` release remains published with its original artifact.
 - Developer ID signing and Hardened Runtime for app-only `v0.1.1`: PASS locally with team
   `DYT47RAAJW`.
-- Apple notarization, GitHub publication, and Tap update for app-only `v0.1.1`: NOT RUN. The
-  Keychain notarization profile is valid, but no new submission was made during local preparation.
+- Apple notarization, GitHub publication, and Tap update for app-only `v0.1.1`: PASS. The notarized
+  artifact was accepted by Apple, published at GitHub, and referenced by the updated Cask.
 - Real Volcengine provider test with repository-owned synthetic audio: NOT RUN; requires explicit
   authorization and a valid `ARK_PLAN_API_KEY`.
-- Real Codex end-to-end test: NOT RUN for the final signed artifact. Must verify Codex-only
-  `Command+R`, microphone capture, visible partial replacement, final replacement, preservation of
-  unrelated composer text, and cancellation. With auto-send enabled, each successful non-empty
-  final transcription must send exactly once; with it disabled, final text must remain in the
-  composer. Partial, empty, failed, cancelled, stale, and unfocused sessions must never send.
-- Homebrew Tap clean install/upgrade/uninstall for `v0.1.1`: NOT RUN until that release exists.
+- Real Codex end-to-end test: PASS by maintainer confirmation. The maintainer verified Codex-only
+  `Command+R`, microphone capture, partial/final replacement, preservation of unrelated composer
+  text, cancellation, and auto-send behavior. The Computer Use agent cannot operate its own Codex
+  host window because of a platform safety boundary.
+- Homebrew Cask remote resolution for `v0.1.1`: PASS. A clean install/upgrade/uninstall cycle was
+  not run to avoid replacing the currently verified local app during publication.
 
 The native Settings window and menu bar UI have been inspected on the macOS host. macOS desktop
 apps do not use an iOS-style simulator; host execution is the applicable GUI test environment.
