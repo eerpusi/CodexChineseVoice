@@ -136,6 +136,20 @@ final class PermissionPreflightTests: XCTestCase {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
         )
     }
+
+    func testMicrophoneSettingsURLTargetsPrivacyMicrophone() {
+        XCTAssertEqual(
+            SystemPermissionProvider.microphoneSettingsURL.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        )
+    }
+
+    func testAccessibilitySettingsURLTargetsPrivacyAccessibility() {
+        XCTAssertEqual(
+            SystemPermissionProvider.accessibilitySettingsURL.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        )
+    }
 }
 
 private final class FakePermissionProvider: PermissionProviding, @unchecked Sendable {

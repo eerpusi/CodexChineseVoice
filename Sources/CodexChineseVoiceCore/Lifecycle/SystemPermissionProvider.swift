@@ -4,6 +4,14 @@ import CoreGraphics
 import Foundation
 
 public final class SystemPermissionProvider: PermissionProviding, @unchecked Sendable {
+    public static let microphoneSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+    )!
+
+    public static let accessibilitySettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    )!
+
     public static let inputMonitoringSettingsURL = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
     )!

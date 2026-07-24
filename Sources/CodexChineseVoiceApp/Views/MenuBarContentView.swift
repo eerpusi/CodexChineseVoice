@@ -19,18 +19,16 @@ struct MenuBarContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
 
-        if model.state == .needsInputMonitoringPermission {
-            Text("要监听 Codex 中的 Command+R，需要允许本应用访问全局键盘事件。")
+        if let permissionSettings = model.state.permissionSettingsPresentation {
+            Text(permissionSettings.message)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
-                NSWorkspace.shared.open(
-                    SystemPermissionProvider.inputMonitoringSettingsURL
-                )
+                NSWorkspace.shared.open(permissionSettings.url)
             } label: {
-                Label("打开输入监控设置", systemImage: "arrow.up.forward.app")
+                Label(permissionSettings.buttonTitle, systemImage: "arrow.up.forward.app")
             }
         }
 
