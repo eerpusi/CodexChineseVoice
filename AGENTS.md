@@ -122,6 +122,9 @@ integration or release checkpoints.
   documentation. Small, local changes do not require a separate design document.
 - Keep acceptance criteria and known limitations visible in the task or change notes.
 - Fix the root cause of failures, but do not broaden the change to unrelated cleanup.
+- After every external release, append a concise entry to `docs/release.md` covering any
+  interruption, recovery, or verification gap, together with the prevention check for future
+  releases. Do this before declaring publication complete.
 
 ## Documentation Hygiene
 

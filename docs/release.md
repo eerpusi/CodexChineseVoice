@@ -87,3 +87,24 @@ The generated Cask must contain an `app "CodexChineseVoice.app"` stanza and no `
 
 Do not publish an ad-hoc signed archive. A real release must pass Apple notarization and the manual
 acceptance checklist in `docs/acceptance.md`.
+
+## Post-Release Verification And Learning Log
+
+After every external release, record any interruption, recovery, or verification gap in this
+section. Before declaring the release complete, verify all of the following from the remote
+services rather than relying on local command startup:
+
+1. The GitHub Release is public and contains the ZIP and checksum asset.
+2. The release ZIP digest matches the generated Cask SHA-256.
+3. The remote Tap Cask has the intended version, release URL, and `app` stanza.
+4. The primary repository branch and working tree are clean after publishing.
+
+### v0.1.2
+
+- The Apple notarization submission was accepted, but the command observer returned while the
+  long-running wait was still in progress. Recovery: query the submission ID with
+  `xcrun notarytool info`; when accepted, staple and validate the existing app instead of
+  submitting it again.
+- The GitHub Release assets were created before the Tap update completed, leaving the remote Cask
+  at `0.1.1`. Recovery: compare the remote Cask against the Release asset digest, then update the
+  Cask through the GitHub contents API and verify its raw remote content.
